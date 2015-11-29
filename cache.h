@@ -18,6 +18,7 @@ typedef struct blockListNode
 
 typedef struct block
 {
+    pthread_mutex_t *lock;
     file_desc_t partOf;
     bool dirty;
     offset_t offset;
@@ -38,7 +39,6 @@ typedef struct cache
     block_list_node_t *FreeList;
     block_list_node_t *DirtyList;
     Hashmap * ActiveBlocks;
-    struct blockListNode *next;
 } cache_t;
 
 

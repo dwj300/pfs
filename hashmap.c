@@ -17,6 +17,7 @@ static int default_compare(void *a, void *b)
  * Simple Bob Jenkins's hash algorithm taken from the
  * wikipedia description.
  */
+/*
 static uint32_t default_hash(void *a)
 {
     size_t len = blength((bstring)a);
@@ -37,7 +38,7 @@ static uint32_t default_hash(void *a)
 
     return hash;
 }
-
+*/
 
 Hashmap *Hashmap_create(Hashmap_compare compare, Hashmap_hash hash)
 {
@@ -48,8 +49,14 @@ Hashmap *Hashmap_create(Hashmap_compare compare, Hashmap_hash hash)
     	return NULL;
     else
         map->compare = compare;
-	
-    map->hash = hash == NULL ? default_hash : hash;
+    if(hash == NULL)
+    	return NULL;
+    else
+        map->hash = hash;
+
+    //map->compare = compare == NULL ? default_compare : compare;
+    //map->hash = hash == NULL ? default_hash : hash;
+
     map->buckets = DArray_create(sizeof(DArray *), DEFAULT_NUMBER_OF_BUCKETS);
     map->buckets->end = map->buckets->max; // fake out expanding it
     //check_mem(map->buckets);
@@ -172,12 +179,12 @@ void *Hashmap_get(Hashmap *map, void *key)
     if(i == -1) return NULL;
 
     HashmapNode *node = DArray_get(bucket, i);
-    check(node != NULL, "Failed to get node from bucket when it should exist.");
+    //check(node != NULL, "Failed to get node from bucket when it should exist.");
 
     return node->data;
 
-error: // fallthrough
-    return NULL;
+//error: // fallthrough
+//    return NULL;
 }
 
 
