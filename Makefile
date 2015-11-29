@@ -13,5 +13,8 @@ c2:
 c3:
 	$(CC) $(CFLAGS) $(CFLAGS2) c3 pfs.c test1-c3.c
 
+server:
+	$(CC) $(CFLAGS) $(CFLAGS2) server server.c
+
 clean:
 	rm *.o c1 c2 c3
