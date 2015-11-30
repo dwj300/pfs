@@ -43,6 +43,5 @@ void initialize(int argc, char **argv)
     free_list = malloc(sizeof(list_t));
     free_list->length = 0;
     free_list->head = cache;
-    void* temp = cache;
-    temp +=
+    //void* temp = cache;
 }

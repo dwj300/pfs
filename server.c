@@ -1,10 +1,5 @@
 #include "server.h"
 
-void error(char *msg) {
-    perror(msg);
-    exit(1);
-}
-
 int create_block(char* block_id) {
     FILE *file = fopen(block_id, "w+");
     if (file == NULL) {
@@ -79,18 +74,17 @@ int parse_args(char *buffer, char **opcode, char **block_id, char **data) {
     return 0;
 }
 
-
 int main(int argc, char *argv[])
 {
     int sockfd, newsockfd, port, n;
     socklen_t clilen;
     if (argc < 2) {
-        //error("usage: server [port] [directory]");
-        port = 9995;
+        fprintf(stderr, "usage: server [port]\n"); //[directory]");
+        exit(1);
     }
     else {
         port = atoi(argv[1]);
-        //char *directory = argv[2];
+        //char *directory = argv[2]; //todo
     }
     printf("File server starting on port: %d\n", port);
 
@@ -100,14 +94,16 @@ int main(int argc, char *argv[])
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
-        error("ERROR opening socket");
+        fprintf(stderr, "ERROR opening socket");
+        exit(1);
     }
     bzero((char *) &serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(port);
     if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-        error("ERROR on binding");
+        fprintf(stderr, "ERROR on binding");
+        exit(1);
     }
 
     listen(sockfd,5);
@@ -116,15 +112,16 @@ int main(int argc, char *argv[])
     while(1) {
         newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
         if (newsockfd < 0) {
-          error("ERROR on accept");
-        }
-        bzero(buffer,256);
-        n = read(newsockfd,buffer,2048);
-        if (n < 0) {
-            error("ERROR reading from socket");
+          fprintf(stderr, "ERROR on accept");
+          exit(1);
         }
 
-        // fprintf("Here is the message: %s\n",buffer);
+        bzero(buffer,1040);
+        n = read(newsockfd,buffer,1040);
+        if (n < 0) {
+            fprintf(stderr, "ERROR reading from socket");
+            exit(1);
+        }
         
         char *opcode = NULL;
         char *block_id = NULL;
@@ -132,10 +129,6 @@ int main(int argc, char *argv[])
         if (parse_args(buffer, &opcode, &block_id, &data) < 0) {
             continue;
         }
-        
-        // fprintf(stderr, "opcode:%sdone\n", opcode);
-        // fprintf(stderr, "block_id:%sdone\n", block_id);
-        // fprintf(stderr, "data:%sdone\n", data);
 
         if (strcmp(opcode, "CREATE") == 0) {
             create_block(block_id);
