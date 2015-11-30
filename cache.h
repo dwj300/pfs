@@ -18,7 +18,8 @@ typedef struct blockListNode
 
 typedef struct block
 {
-    file_desc_t partOf;
+    global_block_id_t id;
+    pthread_mutex_t *lock;
     bool dirty;
     offset_t offset;
     void *data;
@@ -31,6 +32,15 @@ typedef struct blockListNode
 } block_list_node_t;
 
 
+//Block Access Methods
+block_t * initializeBlock();
+
+//Block List Access Methods
+block_list_node_t *initializeBlockListNode();
+void addBlockToBlockList(block_t * blockToAdd, block_list_node_t * headOfTargetList);
+void removeBlockFromBlockList(global_block_id_t idOfBlockToRemove, block_list_node_t * headOfHostList);
+
+
 
 //Cache instance struct
 typedef struct cache
@@ -38,7 +48,6 @@ typedef struct cache
     block_list_node_t *FreeList;
     block_list_node_t *DirtyList;
     Hashmap * ActiveBlocks;
-    struct blockListNode *next;
 } cache_t;
 
 
