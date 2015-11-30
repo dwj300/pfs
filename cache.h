@@ -21,8 +21,7 @@ typedef struct block
     global_block_id_t id;
     pthread_mutex_t *lock;
     bool dirty;
-    offset_t offset;
-    void *data;
+    byte *data;
 } block_t;
 
 typedef struct blockListNode
