@@ -1,16 +1,14 @@
-#include <darray.h>
-#include <assert.h>
-
+#include "darray.h"
 
 DArray *DArray_create(size_t element_size, size_t initial_max)
 {
     DArray *array = malloc(sizeof(DArray));
-    check_mem(array);
+    // check_mem(array);
     array->max = initial_max;
-    check(array->max > 0, "You must set an initial_max > 0.");
+    // check(array->max > 0, "You must set an initial_max > 0.");
 
     array->contents = calloc(initial_max, sizeof(void *));
-    check_mem(array->contents);
+    // check_mem(array->contents);
 
     array->end = 0;
     array->element_size = element_size;
@@ -18,7 +16,7 @@ DArray *DArray_create(size_t element_size, size_t initial_max)
 
     return array;
 
-error:
+    // error:
     if(array) free(array);
     return NULL;
 }
@@ -38,31 +36,31 @@ void DArray_clear(DArray *array)
 static inline int DArray_resize(DArray *array, size_t newsize)
 {
     array->max = newsize;
-    check(array->max > 0, "The newsize must be > 0.");
+    // check(array->max > 0, "The newsize must be > 0.");
 
     void *contents = realloc(array->contents, array->max * sizeof(void *));
     // check contents and assume realloc doesn't harm the original on error
 
-    check_mem(contents);
+    // check_mem(contents);
 
     array->contents = contents;
 
     return 0;
-error:
+    // error:
     return -1;
 }
 
 int DArray_expand(DArray *array)
 {
     size_t old_max = array->max;
-    check(DArray_resize(array, array->max + array->expand_rate) == 0,
-            "Failed to expand array to new size: %d",
-            array->max + (int)array->expand_rate);
+    //check(DArray_resize(array, array->max + array->expand_rate) == 0,
+    //        "Failed to expand array to new size: %d",
+    //        array->max + (int)array->expand_rate);
 
     memset(array->contents + old_max, 0, array->expand_rate + 1);
     return 0;
 
-error:
+    // error:
     return -1;
 }
 
@@ -102,7 +100,7 @@ int DArray_push(DArray *array, void *el)
 
 void *DArray_pop(DArray *array)
 {
-    check(array->end - 1 >= 0, "Attempt to pop from empty array.");
+    // check(array->end - 1 >= 0, "Attempt to pop from empty array.");
 
     void *el = DArray_remove(array, array->end - 1);
     array->end--;
@@ -112,6 +110,6 @@ void *DArray_pop(DArray *array)
     }
 
     return el;
-error:
+    // error:
     return NULL;
 }
