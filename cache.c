@@ -167,10 +167,10 @@ block_t * initializeBlock()
 //                     OR if the block is dirty
 bool destroyBlock(block_t * toDeallocate)
 {
-
-    pthread_mutex_unlock(toDeallocate->lock);
+    pthread_mutex_lock(toDeallocate->lock);
+    
     free(toDeallocate->lock);
-    free(
+
        
     if(newBlock)
     {    
@@ -188,6 +188,7 @@ bool resetBlock
 
 //A 'clear' block is effectively empty and free for population
 //  All blocks on the free list (and no other blocks) should be cleared
+//  Note that this is only reliable if called by a thread with a lock on the block
 bool blockIsCleared(block_t * block)
 {
     if(!block)
@@ -195,10 +196,10 @@ bool blockIsCleared(block_t * block)
         print("The block being checked does not exist.");
         return false;
     }
-    bool cleared = ( pthread_mutex_trylock(block->lock) == 0  &&  block->dirty  &&  block->id == BLOCK_IS_FREE);
-    pthread_mutex_unlock(block->lock);
-    return cleared;
+    return ( block->dirty  &&  block->id == BLOCK_IS_FREE );
 }
+
+
 
 //Place the given data into the given block, with the specified global block id
 //  Returns true on success, false otherwise:
@@ -210,12 +211,12 @@ bool populateBlock(block_t * targetBlock, byte * data, global_block_id_t id)
         print("You cannot populate a NULL block.");
         return false;
     }
+    pthread_mutex_lock(targetBlock->lock);
     if( !blockIsCleared(targetBlock) )
     {
         print("You cannot populate a uncleared block");
         return false;
     }
-    pthread_mutex_lock(targetBlock->lock);
     targetBlock->id = id;
     targetBlock->dirty = false;
     targetBlock->data = data;
