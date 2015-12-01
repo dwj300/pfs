@@ -1,6 +1,6 @@
-#include "sharedtypes.h"
+#include "sharedresources.h"
 
 void print(char* msg)
 {
-    printf(msg);
+    fprintf(stderr, msg);
 }

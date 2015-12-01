@@ -17,12 +17,12 @@ static uint32_t globalBlockIDHash(void *globalBlockID)
 
 cache_t * InitializeCache()
 {
-    cache * newCache = (cache *)malloc(sizeof(cache));
+    cache_t * newCache = (cache *)malloc(sizeof(cache));
     newCache->FreeList = initializeBlockListNode();
     newCache->DirtyList = initializeBlockListNode();
 
     //Hashmap *Hashmap_create(Hashmap_compare compare, Hashmap_hash);
-	newCache->ActiveBlocks = Hashmap_create(compareBlocks, globalBlockIDHash)
+    newCache->ActiveBlockMap = Hashmap_create(compareBlocks, globalBlockIDHash);
 
 
     return NULL;
@@ -32,12 +32,12 @@ block_list_node_t *initializeBlockListNode()
 {
     block_list_node_t * newBlockListNode = (block_list_node_t *)malloc(sizeof(block_list_node_t));
     if(newBlockListNode)
-    {    
+    {
         newBlockListNode->block = initializeBlock();
         if(newBlockListNode->block)
         {
             newBlockListNode->next = NULL;
-            return newBlockListNode;       
+            return newBlockListNode;
         }
     }
     return NULL;
@@ -50,7 +50,7 @@ void destroyBlockListNode(block_list_node_t * toDestroy)
     {
         print("You can not destroy a null block list node");
     }
-    free(toDestroy);     
+    free(toDestroy);
 }
 
 
@@ -76,7 +76,7 @@ void addBlockToBlockList(block_t * blockToAdd, block_list_node_t * headOfTargetL
 
 //  -Finds a given block in given block list
 //  -Removes the node holding the block from the list
-//      -Redefines the head of the list iff the block is in the head node 
+//      -Redefines the head of the list iff the block is in the head node
 //  -Returns a reference to the block itself
 //      -Returns NULL if the block isn't found in the list
 block_t * extractBlockFromBlockList(global_block_id_t idOfBlockToRemove, block_list_node_t ** referenceToHostList)
@@ -147,33 +147,33 @@ block_t * initializeBlock()
 {
     block_t * newBlock = (block_t *)malloc(sizeof(block_t));
     if(newBlock)
-    {    
+    {
         newBlock->lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
         pthread_mutex_init(newBlock->lock, NULL);
-        newBlock->global_block_id_t = BLOCK_IS_FREE;
+        newBlock->id = BLOCK_IS_FREE;
         newBlock->dirty = false;
 		newBlock->offset = 0;
         newBlock->data = NULL;
         return newBlock;
     }
-    return NULL;  
+    return NULL;
 }
 
 
 //Destroys (de-allocates) a cache block object
 //  This should ONLY be called on cache destruction / closing the file system
 //  Returns true if successful, false otherwise
-//      -Returns false if someone is holding the lock on the block 
+//      -Returns false if someone is holding the lock on the block
 //                     OR if the block is dirty
 bool destroyBlock(block_t * toDeallocate)
 {
     pthread_mutex_lock(toDeallocate->lock);
-    
+
     free(toDeallocate->lock);
 
-       
+
     if(newBlock)
-    {    
+    {
         newBlock->lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
         pthread_mutex_init(newBlock->lock, NULL);
         newBlock->id = BLOCK_IS_FREE;
@@ -184,7 +184,7 @@ bool destroyBlock(block_t * toDeallocate)
 
 }
 
-bool resetBlock
+// bool resetBlock
 
 //A 'clear' block is effectively empty and free for population
 //  All blocks on the free list (and no other blocks) should be cleared
@@ -239,7 +239,7 @@ bool clearBlock(cache_t * cache, block_t * toClear)
     if(toClear->dirty)
     {
         if( !pushBlockToServer(toClear) )
-            return false
+            return false;
         toClear->dirty = false;
     }
     free(toClear->data);
@@ -260,10 +260,10 @@ bool pushBlockToServer(block_t * toPush)
 block_t * GetBlockFromCache(cache * cache, global_block_id_t targetBlock)
 {
     if(!cache || !cache->ActiveBlocks)
-        print("The cache object has no been properly initialized"); 
+        print("The cache object has no been properly initialized");
     //Look into active map and attempt to find target block
-    //void *Hashmap_get(Hashmap *map, void *key);  
-    return (block_t *)Hashmap_get(cache->ActiveBlocks, &targetBlock);    
+    //void *Hashmap_get(Hashmap *map, void *key);
+    return (block_t *)Hashmap_get(cache->ActiveBlocks, &targetBlock);
 }
 
 
@@ -271,11 +271,11 @@ block_t * GetBlockFromCache(cache * cache, global_block_id_t targetBlock)
 block_t * GetFreeBlockFromCache(cache * cache, global_block_id_t targetBlock)
 {
     if(!cache || !cache->FreeList)
-        print("The cache object has no been properly initialized"); 
+        print("The cache object has no been properly initialized");
     //Attempt to get a block from the free list
-    
-    //void *Hashmap_get(Hashmap *map, void *key);  
-    return (block_t *)Hashmap_get(cache->ActiveBlocks, &targetBlock);    
+
+    //void *Hashmap_get(Hashmap *map, void *key);
+    return (block_t *)Hashmap_get(cache->ActiveBlocks, &targetBlock);
 }
 
 
@@ -297,12 +297,12 @@ bool MarkBlockDirty(cache * cache, global_block_id_t targetBlock)
     else
     {
         if(toMark->dirty)
-            print("block was already dirty"); 
+            print("block was already dirty");
         //CONCERN: what if multiple lock contentions are served in non-fifo order?
         pthread_mutex_lock(toMark->lock);
         toMark->dirty = true;
         //Add to dirty list
-        
+
         pthread_mutex_unlock(toMark->lock);
     }
 }
@@ -314,7 +314,7 @@ bool BlockIsDirty(cache * cache, global_block_id_t targetBlock)
     if(!toCheck)
         return false;
     else
-    { 
+    {
         //CONCERN: what if multiple lock contentions are served in non-fifo order?
 	    //CONCERN: what if dirty state changes after releasing the lock and returning?
         pthread_mutex_lock(toMark->lock);

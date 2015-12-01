@@ -19,5 +19,8 @@ server: server.c
 client: client.c
 	$(CC) $(CFLAGS) $(CFLAGS2) client client.c
 
+cache: cache.c
+	$(CC) $(CFLAGS) $(CFLAGS2) cache cache.c
+
 clean:
 	rm c1 c2 c3 client server

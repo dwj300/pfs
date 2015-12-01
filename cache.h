@@ -2,20 +2,16 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include "hashmap.h"
 #include "sharedresources.h"
 
 
 typedef int32_t file_desc_t;
 typedef int32_t offset_t;
+typedef char byte;
+typedef int (cond_t)();
 
 // General struct definitions
-typedef struct blockListNode
-{
-    block_t *block;
-    struct blockListNode *next;
-} block_list_node_t;
-
-
 typedef struct block
 {
     global_block_id_t id;
@@ -51,7 +47,7 @@ typedef struct block_queue_node
 
 typedef struct queue
 {
-    queue_node_t *head;
+    block_queue_node_t *head;
 } queue_t;
 
 
@@ -71,8 +67,8 @@ typedef struct cache
 
 //Cache access methods
 
-cache * InitializeCache();
-block_t * GetBlock(cache * cache, global_block_id_t targetBlock);
+cache_t * InitializeCache();
+block_t * GetBlock(cache_t* cache, global_block_id_t targetBlock);
 bool ReleaseBlock(global_block_id_t targetBlock);
 bool MarkBlockDirty(global_block_id_t targetBlock);
 bool BlockIsDirty(global_block_id_t targetBlock);

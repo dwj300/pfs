@@ -1,5 +1,4 @@
 #undef NDEBUG
-#include <stdint.h>
 #include <hashmap.h>
 
 //#include <lcthw/hashmap.h>
@@ -13,7 +12,7 @@ static int default_compare(void *a, void *b)
 }
 */
 
-/** 
+/**
  * Simple Bob Jenkins's hash algorithm taken from the
  * wikipedia description.
  */
