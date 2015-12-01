@@ -39,6 +39,7 @@ c3
 server
 grapevine
 dummyc
+client
 # Mac OS X
 .DS_Store
 
