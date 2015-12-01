@@ -74,64 +74,75 @@ void addBlockToBlockList(block_t * blockToAdd, block_list_node_t * headOfTargetL
     sentinel->next = blockToAdd;
 }
 
-
-void removeBlockFromBlockList(global_block_id_t idOfBlockToRemove, block_list_node_t * headOfHostList)
+//  -Finds a given block in given block list
+//  -Removes the node holding the block from the list
+//      -Redefines the head of the list iff the block is in the head node 
+//  -Returns a reference to the block itself
+//      -Returns NULL if the block isn't found in the list
+block_t * extractBlockFromBlockList(global_block_id_t idOfBlockToRemove, block_list_node_t ** referenceToHostList)
 {
-    if(!headOfHostList)
+    if(!(*referenceToHostList))
     {
         print("Host block list doesn't exist, aborting block removal");
         return;
     }
-    block_list_node_t * sentinel = headOfHostList;
+    block_list_node_t * sentinel = *(referenceToHostList);
     block_list_node_t * last = NULL;
     while(sentinel)
     {
         if(sentinel->block->id == idOfBlockToRemove)
         {
+            block_t * toReturn = sentinel->block;
             if(last)
             {
                 //Reconnect
                 last->next = sentinel->next;
             }
+            else
+            {
+                //Redefine the head of the list
+                *(referenceToHostList) = sentinel->next;
+            }
             destroyBlockListNode(sentinel);
+            return toReturn;
         }
         else
+        {
+            last = sentinel;
             sentinel = sentinel->next;
+        }
     }
     print("Host block list didn't contain the specified block, aborting block removal");
+    return NULL;
 }
 
 
-
-block_t * popBlockFromBlockList(block_list_node_t * headOfHostList)
+//  -Removes the node at the head of the given list
+//      -Redefines the head of the list
+//  -Returns a reference to the block that was in that node
+//      -Returns NULL if the list is NULL
+block_t * popBlockFromBlockList(block_list_node_t ** referenceToHostList)
 {
-    if(!headOfHostList)
+    if(!(*referenceToHostList))
     {
         print("Host block list doesn't exist, aborting block pop");
-        return;
+        return NULL;
     }
-    if(!headOfHostList->block)
+    block_list_node_t * head = *referenceToHostList;
+    block_t * toReturn = head->block;
+    if(head->next)
     {
-        print("Host block list is empty, aborting block pop");
-        return;
+        //Redefine the head of the list
+        *referenceToHostList = head->next;
     }
-    block_t * freeBlock = headOfHostList->block;
-    headOfHostList
-    headOfHostList = headOfHostList->next;
-    while(sentinel)
-    {
-        if(sentinel->block->id == idOfBlockToRemove)
-            return sentinel->block;
-        else
-            sentinel = sentinel->next;
-    }
-    print("Host block list didn't contain the specified block, aborting block removal");
+    destroyBlockListNode(head);
+    return toReturn;
 }
 
 
 
-
-
+//Creates and sets up a cache block object
+//  This should ONLY be called on cache initialization
 block_t * initializeBlock()
 {
     block_t * newBlock = (block_t *)malloc(sizeof(block_t));
@@ -148,22 +159,103 @@ block_t * initializeBlock()
     return NULL;  
 }
 
-//Blocks represent cache blocks, which aren't actually 'destroyed' - just 'cleared':
-//   after clearing, the block should be on the free list only, it's state should be equivalent to its initalized state
-//   if the block is dirty, it must be written through to its host server
-void clearBlock(cache_t * cache, block_t * toClear)
+
+//Destroys (de-allocates) a cache block object
+//  This should ONLY be called on cache destruction / closing the file system
+//  Returns true if successful, false otherwise
+//      -Returns false if someone is holding the lock on the block 
+//                     OR if the block is dirty
+bool destroyBlock(block_t * toDeallocate)
+{
+    pthread_mutex_lock(toDeallocate->lock);
+    
+    free(toDeallocate->lock);
+
+       
+    if(newBlock)
+    {    
+        newBlock->lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+        pthread_mutex_init(newBlock->lock, NULL);
+        newBlock->id = BLOCK_IS_FREE;
+        newBlock->dirty = false;
+        newBlock->data = NULL;
+        return newBlock;
+    }
+
+}
+
+bool resetBlock
+
+//A 'clear' block is effectively empty and free for population
+//  All blocks on the free list (and no other blocks) should be cleared
+//  Note that this is only reliable if called by a thread with a lock on the block
+bool blockIsCleared(block_t * block)
+{
+    if(!block)
+    {
+        print("The block being checked does not exist.");
+        return false;
+    }
+    return ( block->dirty  &&  block->id == BLOCK_IS_FREE );
+}
+
+
+
+//Place the given data into the given block, with the specified global block id
+//  Returns true on success, false otherwise:
+//      Returns false if the block isn't clear
+bool populateBlock(block_t * targetBlock, byte * data, global_block_id_t id)
+{
+    if(!targetBlock)
+    {
+        print("You cannot populate a NULL block.");
+        return false;
+    }
+    pthread_mutex_lock(targetBlock->lock);
+    if( !blockIsCleared(targetBlock) )
+    {
+        print("You cannot populate a uncleared block");
+        return false;
+    }
+    targetBlock->id = id;
+    targetBlock->dirty = false;
+    targetBlock->data = data;
+    pthread_mutex_unlock(targetBlock->lock);
+}
+
+
+//Blocks represent cache blocks, which are commonly 'cleared':
+//   -If the block is dirty, it's data is written back to the server
+//   -The memory containing the block's data is deallocated
+//   -The block's status information is reset
+bool clearBlock(cache_t * cache, block_t * toClear)
 {
     if(!toClear)
     {
         print("You can not clear a null block");
+        return false;
     }
     pthread_mutex_lock(toClear->lock);
     if(toClear->dirty)
-        print("Pushing block to server");
-        
+    {
+        if( !pushBlockToServer(toClear) )
+            return false
+        toClear->dirty = false;
+    }
+    free(toClear->data);
+    toClear->id = BLOCK_IS_FREE;
     pthread_mutex_unlock(toClear->lock);
 
 }
+
+
+bool pushBlockToServer(block_t * toPush)
+{
+    print("Pushing block to server");
+    return false;
+}
+
+
 
 block_t * GetBlockFromCache(cache * cache, global_block_id_t targetBlock)
 {
@@ -173,6 +265,8 @@ block_t * GetBlockFromCache(cache * cache, global_block_id_t targetBlock)
     //void *Hashmap_get(Hashmap *map, void *key);  
     return (block_t *)Hashmap_get(cache->ActiveBlocks, &targetBlock);    
 }
+
+
 
 block_t * GetFreeBlockFromCache(cache * cache, global_block_id_t targetBlock)
 {
@@ -184,10 +278,12 @@ block_t * GetFreeBlockFromCache(cache * cache, global_block_id_t targetBlock)
     return (block_t *)Hashmap_get(cache->ActiveBlocks, &targetBlock);    
 }
 
-void FetchBlockFromServer(cache * targetCache, global_block_id_t idOfBlockToFetch)
+
+
+bool FetchBlockFromServer(cache * targetCache, global_block_id_t idOfBlockToFetch)
 {
     //Lookup in the recipe which server has the block
-    return    
+    return false;
 }
 
 
@@ -206,6 +302,7 @@ bool MarkBlockDirty(cache * cache, global_block_id_t targetBlock)
         pthread_mutex_lock(toMark->lock);
         toMark->dirty = true;
         //Add to dirty list
+        
         pthread_mutex_unlock(toMark->lock);
     }
 }

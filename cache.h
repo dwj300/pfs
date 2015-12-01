@@ -21,8 +21,7 @@ typedef struct block
     global_block_id_t id;
     pthread_mutex_t *lock;
     bool dirty;
-    offset_t offset;
-    void *data;
+    byte *data;
 } block_t;
 
 typedef struct blockListNode
@@ -41,13 +40,30 @@ void addBlockToBlockList(block_t * blockToAdd, block_list_node_t * headOfTargetL
 void removeBlockFromBlockList(global_block_id_t idOfBlockToRemove, block_list_node_t * headOfHostList);
 
 
+typedef struct block_queue_node
+{
+    pthread_cond_t *cVar;
+    cond_t *progress_condition;
+    int priority;
+    void *data;
+    struct queue_node *next;
+} block_queue_node_t;
+
+typedef struct queue
+{
+    queue_node_t *head;
+} queue_t;
+
+
+
 
 //Cache instance struct
 typedef struct cache
 {
     block_list_node_t *FreeList;
     block_list_node_t *DirtyList;
-    Hashmap * ActiveBlocks;
+    Hashmap * ActiveBlockLookupMap;
+    Hashmap * ActiveBlockMap;
 } cache_t;
 
 
