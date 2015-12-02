@@ -40,6 +40,7 @@ server
 grapevine
 dummyc
 client
+cache
 # Mac OS X
 .DS_Store
 
