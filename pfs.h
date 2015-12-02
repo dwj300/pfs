@@ -4,6 +4,7 @@
 #include <stdlib.h>
 
 #include "config.h"
+#include "sharedresources.h"
 
 int pfs_create(const char *filename, int stripe_width);
 int pfs_open(const char *filename, const char mode);
@@ -14,6 +15,11 @@ int pfs_delete(const char *filename);
 int pfs_fstat(int filedes, struct pfs_stat *buf); // Check the config file for the definition of pfs_stat structure
 void initialize(int argc, char **argv);
 
+file_t files[MAX_FILES];
+
+unsigned int current_fd;
+
+// I think we can delete these structs
 typedef struct node {
     void* data;
     struct node* next;
@@ -25,3 +31,5 @@ typedef struct list {
 } list_t;
 
 list_t* free_list;
+
+

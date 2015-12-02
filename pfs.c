@@ -37,6 +37,8 @@ int pfs_fstat(int filedes, struct pfs_stat *buf) // Check the config file for th
 
 void initialize(int argc, char **argv)
 {
+    current_fd = 0;
+    // We can probably delete all of this code
     // Set up cache 2 / (1*1024)
     int num_blocks = (CLIENT_CACHE_SIZE / PFS_BLOCK_SIZE) * 1024;
     void *cache = malloc(num_blocks * PFS_BLOCK_SIZE);

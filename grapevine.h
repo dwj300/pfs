@@ -1,0 +1,1 @@
+#include "sharedresources.h"

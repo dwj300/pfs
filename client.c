@@ -108,7 +108,7 @@ int delete_block(char *host, int port, int block_id) {
     int sock_id = connect_socket(host, port);
     delete_block_on_fs(sock_id, block_id);
     close(sock_id);
-    return 0;   
+    return 0;
 }
 
 int main(int argc, char *argv[]) {

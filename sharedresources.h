@@ -7,3 +7,7 @@
 
 typedef int bool;
 typedef uint32_t global_block_id_t;
+
+typedef struct file {
+
+} file_t;
