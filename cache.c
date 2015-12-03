@@ -1,14 +1,5 @@
 #include "cache.h"
-
-//typedef int (*Hashmap_compare)(void* a, void* b);
-Hashmap_compare compareBlocks(void* a, void* b) {
-    return(*((global_block_id_t*)b) -* ((global_block_id_t*)a));
-}
-
-//typedef uint32_t (*Hashmap_hash)(void* key);
-Hashmap_hash globalBlockIDHash(void* globalBlockID) {
-    return* ((uint32_t* )globalBlockID); //global block ids are unique... so we should be able to use the identity function* as* our hash function
-}
+#define BLOCK_TABLE_BUCKET_COUNT 1024
 
 cache_t* InitializeCache() {
     cache_t* newCache = (cache_t*)malloc(sizeof(cache_t));
@@ -21,18 +12,6 @@ cache_t* InitializeCache() {
     return NULL;
 }
 
-block_list_node_t* initializeBlockListNode() {
-    block_list_node_t* newBlockListNode = (block_list_node_t* )malloc(sizeof(block_list_node_t));
-    if(newBlockListNode) {
-        newBlockListNode->block = initializeBlock();
-        if(newBlockListNode->block) {
-            newBlockListNode->next = NULL;
-            return newBlockListNode;
-        }
-    }
-    return NULL;
-}
-
 block_t* GetBlock(cache_t* cache, global_block_id_t targetBlock) {
     fprintf(stderr, "ERROR: Not implemented yet.");
     exit(1);
@@ -40,19 +19,114 @@ block_t* GetBlock(cache_t* cache, global_block_id_t targetBlock) {
 }
 
 
-//Destroying a block list node DOES NOT modify the block within it, it simplies frees the list node holding it
-void destroyBlockListNode(block_list_node_t* toDestroy) {
-    if(!toDestroy) {
-        fprintf(stderr, "You can not destroy a null block list node");
+activity_table_t * initializeActivityTable(){
+    activity_table_t * newTable = (activity_table_t *)malloc(sizeof(activity_table_t));
+    if(!newTable){
+        fprintf(stderr, "Memory allocation for activity table failed.");
+        return NULL;
     }
-    free(toDestroy);
+
+    newTable->accessQueue = initializeBlockList();
+    newTable->freeStack = initializeBlockList();
+    if(!(newTable->accessQueue) || !(newTable->freeStack)){
+        fprintf(stderr, "List initialization during activity table initialization failed.");
+        return NULL;
+    }
+
+    //Populate the cache with free blocks
+    int i=0;
+    for(i=0;i<CACHE_BLOCK_COUNT;i++){
+        block_list_node_t* newBlockNode = initializeBlockListNode();
+        if(newBlockNode){
+            if( !addNodeToHeadOfList(newTable->freeStack, newBlockNode)){
+                fprintf(stderr, "Node could not be added to the free stack during activity table initialization.");
+                return NULL;
+            }
+        }
+        else{
+            fprintf(stderr, "Node initialization during activity table initialization failed.");
+            return NULL;
+        }
+    }
+
+    //Create the empty map
+    for(i=0;i<CACHE_MAP_SECTOR_COUNT;i++){
+            newTable->activeBlockMap[i] = initializeBlockList();
+    }
 }
 
-void addBlockToBlockList(block_t* blockToAdd, block_list_node_t* headOfTargetList) {
-    block_list_node_t* newNode = malloc(sizeof(block_list_node_t));
-    newNode->block = blockToAdd;
-    newNode->next = NULL;
 
+uint32_t lookupMapping(global_block_id_t blockID){
+    return blockID%BLOCK_TABLE_BUCKET_COUNT;
+}
+
+
+
+
+
+bool evictFromReferenceQueue(activity_table_t * hostTable)
+{
+    if(!hostTable) {
+        fprintf(stderr, "You cannot evict within a NULL table.");
+        return false;
+    }
+    if(!(hostTable->headOfReferenceQueue) || !(hostTable->tailOfReferenceQueue)) {
+        fprintf(stderr, "You cannot evict from a table with no active blocks.");
+        return false;
+    }
+
+    block_list_node_t* toEvict = hostTable->tailOfReferenceQueue;
+    toEvict->previous = NULL;
+    toEvict->next = NULL;
+
+    //If the node was the only one in the reference queue, the ref. q. is now empty
+    if(hostTable->headOfReferenceQueue == hostTable->tailOfReferenceQueue){
+        hostTable->headOfReferenceQueue = hostTable->tailOfReferenceQueue = NULL;
+    }
+    else{
+        //Otherwise, the ref. q. just has a new tail
+        hostTable->tailOfReferenceQueue = hostTable->tailOfReferenceQueue->previous;
+        hostTable->tailOfReferenceQueue->next = NULL;
+    }
+
+    //If the free stack is empty, the evicted block will be the only member of the free stack
+    if(!(hostTable->headOfFreeStack)){
+        hostTable->headOfFreeStack = toEvict;
+    }
+    else{
+        //Otherwise we must reconnect the old free stack to the new one
+        toEvict->next = headOfFreeStack;
+        hostTable->headOfFreeStack->previous = toEvict
+        hostTable->headOfFreeStack = toEvict;
+    }
+
+    //Remove the reference from the map into the queue
+    removeFromMap(activity_table_t * )
+    return true;
+}
+
+
+bool removeFromMap(block_list_node_t ** map, global_block_id_t keyOfTarget){
+    if(!map){
+        fprintf(stderr, "You cannot remove an entry from a NULL map.");
+        return false;
+    }
+    return removeFromList(key_t, );
+}
+
+
+bool addToMap(block_list_node_t ** map, block_list_node_t * toAdd){
+    if(!map){
+        fprintf(stderr, "You cannot remove an entry from a NULL map.");
+        return false;
+    }
+    block_list_node_t * targetList = map[lookupMapping(toAdd->block->id)];
+    return addToList(toAdd, targetList)
+
+
+}
+
+void addBlockNodeToBlockList(block_list_node_t* blockNodeToAdd, block_list_node_t* headOfTargetList){
     if(!headOfTargetList) {
         fprintf(stderr, "Target block list doesn't exist, aborting block add");
         return;
@@ -68,63 +142,45 @@ void addBlockToBlockList(block_t* blockToAdd, block_list_node_t* headOfTargetLis
     sentinel->next = newNode;
 }
 
-//  -Finds a given block in given block list
-//  -Removes the node holding the block from the list
-//      -Redefines the head of the list iff the block is in the head node
-//  -Returns a reference to the block itself
-//      -Returns NULL if the block isn't found in the list
-block_t* extractBlockFromBlockList(global_block_id_t idOfBlockToRemove, block_list_node_t* * referenceToHostList) {
-    if(!(*referenceToHostList)) {
-        fprintf(stderr, "Host block list doesn't exist, aborting block removal");
-        return NULL;
+
+
+
+
+
+
+bool removeFromList(block_list_node * toRemove){
+    if(!toRemove) {
+        fprintf(stderr, "You cannot remove a NULL node.");
+        return false;
     }
-    block_list_node_t* sentinel =* (referenceToHostList);
-    block_list_node_t* last = NULL;
-    while(sentinel) {
-        if(sentinel->block->id == idOfBlockToRemove) {
-            block_t* toReturn = sentinel->block;
-            if(last) {
-                //Reconnect
-                last->next = sentinel->next;
-            }
-            else {
-                //Redefine the head of the list
-               * (referenceToHostList) = sentinel->next;
-            }
-            destroyBlockListNode(sentinel);
-            return toReturn;
-        }
-        else {
-            last = sentinel;
-            sentinel = sentinel->next;
-        }
+    if(toRemove->previous){
+        toRemove->previous->next = toRemove->next;
     }
-    fprintf(stderr, "Host block list didn't contain the specified block, aborting block removal");
-    return NULL;
+    if(toRemove->next){
+        toRemove->next->previous = toRemove->previous;
+    }
+
 }
 
 
-//  -Removes the node at the head of the given list
-//      -Redefines the head of the list
-//  -Returns a reference to the block that was in that node
-//      -Returns NULL if the list is NULL
-block_t* popBlockFromBlockList(block_list_node_t* * referenceToHostList)
+//each block can be in the reference queue OR the Free Stack
+bool recordReference(aglobal_block_id_t referencedBlockID)
 {
-    if(!(*referenceToHostList))
-    {
-        fprintf(stderr, "Host block list doesn't exist, aborting block pop");
-        return NULL;
-    }
-    block_list_node_t* head =* referenceToHostList;
-    block_t* toReturn = head->block;
-    if(head->next)
-    {
-        //Redefine the head of the list
-       *referenceToHostList = head->next;
-    }
-    destroyBlockListNode(head);
-    return toReturn;
+
 }
+
+//AccessBlock(block_id)
+//First, we check the cache for the block
+    //We attempt to find the block in the reference queue
+        //We look in the hashmap for a reference to the queue node
+//If the block is NOT found:
+   //get it from the server
+   //create a new queue node to hold it
+   //add a reference to the new queue node to the hashmap
+//Push the queue node holding the block to the front of the reference queue
+
+
+
 
 //Creates and sets up a cache block object
 //  This should ONLY be called on cache initialization
