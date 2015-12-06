@@ -23,7 +23,7 @@ client: client.c
 	$(CC) $(CFLAGS) $(CFLAGS2) client client.c
 
 cache: cache.c
-	$(CC) $(CFLAGS) $(CFLAGS2) cache cache.c blockStructs.c
+	$(CC) $(CFLAGS) $(CFLAGS2) cache cache.c blockStructs.c itoa.c
 
 clean:
 	rm c1 c2 c3 client server cache grapevine

@@ -40,7 +40,9 @@ activity_table_t * initializeActivityTable(byte * rawMemoryToManage, uint32_t bl
         }
     }
 
-    //Create the empty map
+    newTable->ActiveBlockMap = (block_mapping_node_t **)malloc(sizeof(block_mapping_node_t *) * CACHE_MAP_SECTOR_COUNT);
+    if(newTable->ActiveBlockMap)
+        fprintf(stderr, "got here.\n");
     for(i=0;i<CACHE_MAP_SECTOR_COUNT;i++){
             newTable->ActiveBlockMap[i] = NULL;
     }
@@ -51,6 +53,7 @@ activity_table_t * initializeActivityTable(byte * rawMemoryToManage, uint32_t bl
 cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWaterMarkPercent, float lowWaterMarkPercent) {
     if( highWaterMarkPercent > 100.0F || highWaterMarkPercent < 0.0F || lowWaterMarkPercent > 100.0F || lowWaterMarkPercent < 0.0F || highWaterMarkPercent < lowWaterMarkPercent){
         fprintf(stderr, "Malformated or illogical cache cleanup parameters (for low and/or high water mark).");
+        return NULL;
     }
 
     cache_t * newCache = (cache_t*)malloc(sizeof(cache_t));
@@ -65,8 +68,7 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
 
     newCache->DirtyList = initializeBlockList();
     newCache->ActivityTable = initializeActivityTable(newCache->ManagedMemory, blockCount, blockSize);
-
-    return NULL;
+    return newCache;
 }
 
 
@@ -86,7 +88,6 @@ block_list_node_t * findBlockNodeInAccessQueue(activity_table_t * activityTable,
     }
     return NULL;
 }
-
 
 
 //Should only be called for active blocks (just added the access queue)
@@ -126,7 +127,6 @@ bool addBlockMapping(activity_table_t * hostTable, block_list_node_t * toAdd){
 }
 
 
-
 //Should only be called for freed blocks (just removed the access queue)
 bool removeBlockMapping(activity_table_t * hostTable, block_list_node_t * toRemove){
     if(!hostTable) {
@@ -158,10 +158,6 @@ bool removeBlockMapping(activity_table_t * hostTable, block_list_node_t * toRemo
     fprintf(stderr, "Block node was not mapped in the table.");
     return false;
 }
-
-
-
-
 
 
 block_t * GetBlock(cache_t* cache, global_block_id_t targetBlock) {
@@ -363,6 +359,80 @@ bool BlockIsDirty(cache_t* cache, global_block_id_t targetBlock) {
     }
 }
 
+uint32_t findWidthUnsigned(uint32_t input){
+    uint32_t width = 1;
+    while(input/10 > 0){
+        width++;
+        input/=10;
+    }
+    return width;
+}
+
+
+char * itoaWrapUn(uint32_t input){
+    char * buf = (char *)malloc( sizeof(char) * (1+findWidthUnsigned(input)) );
+    ultoa(buf, input);
+    return buf;
+}
+
+void printUInt(uint32_t input){
+    char * toPrint = itoaWrapUn(input);
+    fprintf(stderr, toPrint);
+    free(toPrint);
+}
+
+void CacheReport(cache_t * cache){
+    fprintf(stderr, "Used blocks: \n");
+    uint32_t i = 0;
+    uint32_t used = 0;
+    for(; i<CACHE_MAP_SECTOR_COUNT; i++){
+        block_mapping_node_t * sentinel = cache->ActivityTable->ActiveBlockMap[i];
+        while(sentinel){
+            used++;
+            printUInt(sentinel->mappedBlockNode->block->id);
+            if(sentinel->mappedBlockNode->block->dirty)
+                fprintf(stderr, "*");
+            fprintf(stderr, ", ");
+            sentinel = sentinel->next;
+        }
+    }
+    printUInt(used);
+    fprintf(stderr, " total active blocks\n");
+
+    if(used != cache->Occupancy)
+        fprintf(stderr, "Cache is corrupted, the occupancy state variable is not consistent with the map of active blocks. \n");
+
+    uint32_t free = 0;
+    bool dirtyAndFree = false; // Ke$ha's next album title
+    block_list_node_t * sentinel = cache->ActivityTable->FreeStack->head;
+    while(sentinel){
+        free++;
+        if(sentinel->block->dirty){
+            printUInt(sentinel->block->id);
+            fprintf(stderr, "*, ");
+            dirtyAndFree = true;
+        }
+        sentinel = sentinel->next;
+    }
+    if(dirtyAndFree){
+        fprintf(stderr, "Cache is corrupted, a dirty block was found on the free list. \n");
+    }
+    if(free < (cache->BlockCount-cache->Occupancy) ){
+        fprintf(stderr, "Cache is corrupted, there are less free blocks in the free stack than there are recorded as present in the cache.\n");
+    }
+    if(free > (cache->BlockCount-cache->Occupancy) ){
+        fprintf(stderr, "Cache is corrupted, there are more free blocks in the free stack than there are recorded as present in the cache.\n");
+    }
+}
+
 int main(int argc, char* argv[]) {
+    //Smoke tests
+    uint32_t blockCount = 1024;
+    uint32_t blockSize = 1024;
+    float highWaterMark = 80.0F;
+    float lowWaterMark = 20.0F;
+    cache_t * cache = InitializeCache(blockSize, blockCount, highWaterMark, lowWaterMark);
+    CacheReport(cache);
+
     return 0;
 }
