@@ -8,6 +8,7 @@ typedef struct activity_table {
     block_list_t * AccessQueue;
     block_list_t * FreeStack;
     block_mapping_node_t ** ActiveBlockMap;
+    pthread_mutex_t *lock;
 } activity_table_t;
 
 
@@ -20,8 +21,9 @@ typedef struct cache {
     uint32_t LowWaterMark;
 
     id_list_node_t * DirtyList;
+    pthread_mutex_t * DirtyListLock;
+
     activity_table_t * ActivityTable;
-    pthread_mutex_t *lock;
 
     byte * ManagedMemory;
 } cache_t;
