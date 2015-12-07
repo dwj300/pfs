@@ -23,7 +23,7 @@ int connect_socket(char *host, int port) {
          server->h_length);
     serv_addr.sin_port = htons(port);
     if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0) {
-        fprintf(stderr, "ERROR connecting");
+        fprintf(stderr, "ERROR connecting\n");
         return -1;
     }
 
@@ -34,26 +34,36 @@ int connect_socket(char *host, int port) {
 int pfs_create(const char *filename, int stripe_width) {
     int socket_fd = connect_socket(grapevine_host, grapevine_port);
     if (socket_fd < 0) {
+        fprintf(stderr, "Failed to open socket\n");
         exit(1);
     }
     char* command = malloc(269*sizeof(char));
     sprintf(command, "CREATE %s %d", filename, stripe_width);
-    fprintf(stderr, "COMMAND:\n");
-    fprintf(stderr, "%s\n", command);
+    fprintf(stderr, "COMMAND:%s\n", command);
     int length = strlen(command);
     write(socket_fd, command, length+1);
     int success;
     read(socket_fd, &success, sizeof(int));
     fprintf(stderr, "success: %d\n", success);
-
     close(socket_fd);
-    return -1;
+    return success;
 }
 
 int pfs_open(const char *filename, const char mode) {
     // Connect to grapevine:
-    //int socket_fd = connect_socket()
-
+    int socket_fd = connect_socket(grapevine_host, grapevine_port);
+    if (socket_fd < 0) {
+        fprintf(stderr, "Failed to open socket\n");
+        exit(1);
+    }
+    char* command = malloc(269*sizeof(char));
+    sprintf(command, "OPEN %s", filename);
+    fprintf(stderr, "COMMAND: %s\n", command);
+    int length = strlen(command);
+    write(socket_fd, command, length+1); // +1 for null terminator. Not sure if needed
+    //read(socket_fd, &success, sizeof(int)); 
+    // TODO ???
+    close(socket_fd);
     return -1;
 }
 
@@ -62,6 +72,7 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
 }
 
 ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int *cache_hit) {
+
     return -1;
 }
 
@@ -70,7 +81,21 @@ int pfs_close(int filedes) {
 }
 
 int pfs_delete(const char *filename) {
-    return -1;
+    int socket_fd = connect_socket(grapevine_host, grapevine_port);
+    if (socket_fd < 0) {
+        fprintf(stderr, "Failed to open socket\n");
+        exit(1);
+    }
+    char* command = malloc(269*sizeof(char));
+    sprintf(command, "DELETE %s", filename);
+    fprintf(stderr, "COMMAND:%s\n", command);
+    int length = strlen(command);
+    write(socket_fd, command, length+1);
+    int success;
+    read(socket_fd, &success, sizeof(int));
+    fprintf(stderr, "success: %d\n", success);
+    close(socket_fd);
+    return success;
 }
 
 int pfs_fstat(int filedes, struct pfs_stat *buf) { // Check the config file for the definition of pfs_stat structure
@@ -79,6 +104,6 @@ int pfs_fstat(int filedes, struct pfs_stat *buf) { // Check the config file for 
 
 void initialize(int argc, char **argv) {
     grapevine_host = "localhost";
-    grapevine_port = 9869;
+    grapevine_port = 9876;
     current_fd = 0;
 }
