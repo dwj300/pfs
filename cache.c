@@ -1,5 +1,5 @@
 #include "cache.h"
-#define CACHE_MAP_SECTOR_COUNT 1024
+#define CACHE_MAP_SECTOR_COUNT 8
 
 bool CacheIsTooCrowded(cache_t * cache){
     return (cache->Occupancy > cache->HighWaterMark);
@@ -12,9 +12,8 @@ bool CacheIsTooVacant(cache_t * cache){
 
 
 bool pushBlockToServer(block_t* toPush) {
-    fprintf(stderr, "Pushing block to server");
+    fprintf(stderr, "Pushing block to server\n");
     fprintf(stderr, "ERROR: Not implemented yet\n");
-    exit(1);
     return true; //for debugging
 }
 
@@ -255,6 +254,7 @@ bool ReleaseBlockToCache(cache_t* cache, global_block_id_t blockToRelease) {
         }
     }
     hostingNode->block->id = BLOCK_IS_FREE;
+    hostingNode->block->dirty = false;
 
 
     //Add the node to the free stack
@@ -290,6 +290,7 @@ bool EvictBlockToCache(cache_t* cache){
         }
     }
     toEvict->block->id = BLOCK_IS_FREE;
+    toEvict->block->dirty = false;
 
 
     //Add the node to the free stack
@@ -364,19 +365,24 @@ bool FetchBlockFromServer(cache_t* targetCache, global_block_id_t idOfBlockToFet
 
 
 bool MarkBlockDirty(cache_t* cache, global_block_id_t targetBlock) {
-    block_t* toMark = GetBlock(cache, targetBlock);
+    pthread_mutex_lock(cache->lock);
+    block_list_node_t * toMark = findBlockNodeInAccessQueue(cache->ActivityTable, targetBlock);
     if(!toMark) {
+        pthread_mutex_unlock(cache->lock);
         return false;
     }
     else {
-        if(toMark->dirty)
+
+        if(toMark->block->dirty)
             fprintf(stderr, "block was already dirty\n");
         //CONCERN: what if multiple lock contentions are served in non-fifo order?
-        pthread_mutex_lock(toMark->lock);
-        toMark->dirty = true;
+        toMark->block->dirty = true;
         //Add to dirty list
-
-        pthread_mutex_unlock(toMark->lock);
+        if( !addNodeToHeadOfList(cache->DirtyList, toMark) ){
+            pthread_mutex_unlock(cache->lock);
+            return false;
+        }
+        pthread_mutex_unlock(cache->lock);
         return true;
     }
 }
@@ -468,7 +474,10 @@ void CacheReport(cache_t * cache){
 }
 
 void * FlushDirtyBlocks(void * cache){
-    while( CacheIsTooCrowded((cache_t*)cache) && EvictBlockToCache((cache_t*)cache) );
+    while( CacheIsTooCrowded((cache_t*)cache) ){
+        EvictBlockToCache((cache_t*)cache);
+    }
+
     pthread_exit(0);
 }
 
@@ -477,9 +486,11 @@ void SpawnHarvester(){
 }
 
 void SpawnFlusher(cache_t * cache){
+    fprintf(stderr, "Starting flushing. \n");
     pthread_t * hostThread = (pthread_t *)malloc(sizeof(pthread_t));
     int flusher = pthread_create(hostThread, NULL, FlushDirtyBlocks, (void*)cache);
     pthread_join(*hostThread, malloc(4));
+    fprintf(stderr, "Done flushing. \n");
 }
 
 
@@ -489,16 +500,42 @@ int main(int argc, char* argv[]) {
     //Smoke tests
 
     //Batched reservations / release / evict
-    uint32_t blockCount = 2048;
+    uint32_t blockCount = 32;
     uint32_t blockSize = 1024;
-    float highWaterMark = 80.0F;
-    float lowWaterMark = 20.0F;
+    float highWaterMark = 2.0F;
+    float lowWaterMark = 1.0F;
     cache_t * cache = InitializeCache(blockSize, blockCount, highWaterMark, lowWaterMark);
     CacheReport(cache);
 
     ReserveBlockInCache(cache, 1);
+    MarkBlockDirty(cache, 1);
+    ReserveBlockInCache(cache, 257);
+    MarkBlockDirty(cache, 257);
+    ReserveBlockInCache(cache, 513);
+    MarkBlockDirty(cache, 513);
+    ReserveBlockInCache(cache, 769);
+    MarkBlockDirty(cache, 769);
+    CacheReport(cache);
+    EvictBlockToCache(cache);
+    EvictBlockToCache(cache);
+    EvictBlockToCache(cache);
 
-    /*
+
+/*
+    uint32_t i = 1;
+    for(;i<=blockCount/4;i++){
+        ReserveBlockInCache(cache, i);
+        MarkBlockDirty(cache, i);
+    }
+    CacheReport(cache);
+    i = 1;
+    for(;i<=blockCount/8;i++){
+        EvictBlockToCache(cache);
+    }
+    CacheReport(cache);
+
+
+
 
     uint32_t i = 1;
     for(;i<=blockCount;i++){
@@ -523,7 +560,6 @@ int main(int argc, char* argv[]) {
 
 
     //Interlaced reservations / release / evict
-
     i = 1;
     for(;i<=blockCount;i++){
         ReserveBlockInCache(cache, i);
@@ -544,8 +580,9 @@ int main(int argc, char* argv[]) {
     }
     CacheReport(cache);
     for(;i<=blockCount/4;i++){
-        EvictBlockToCache(cache);
+        MarkBlockDirty(cache, i);
     }
+
 
 
     i = 1;
@@ -563,7 +600,30 @@ int main(int argc, char* argv[]) {
     }
     CacheReport(cache);
 
-    */
+
+
+    i = 1;
+    for(;i<=blockCount/4;i++){
+        ReserveBlockInCache(cache, i);
+    }
+    CacheReport(cache);
+
+    i = 1;
+    for(;i<=blockCount/4;i++){
+        MarkBlockDirty(cache->ActivityTable->, i);
+    }
+    CacheReport(cache);
+
+    i = 1;
+    for(;i<=blockCount/8;i++){
+        ReleaseBlockToCache(cache, i);
+    }
+    CacheReport(cache);
+    for(;i<=blockCount/4;i++){
+        EvictBlockToCache(cache);
+    }
+*/
+
 
     return 0;
 }

@@ -145,7 +145,7 @@ bool addNodeToHeadOfList(block_list_t * targetList, block_list_node_t * newHead)
         if( newHead == targetList->tail){
             targetList->tail = targetList->tail->previous;
         }
-
+//BUG - in the case warned of above, the connection here includes a setting of next after the head... essentially it wont allow nodes to be in two lists atm
         //Connect the new head to the target queue
         newHead->next = targetList->head;
         targetList->head->previous = newHead;
