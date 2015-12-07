@@ -63,6 +63,7 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
     }
 
     cache_t * newCache = (cache_t*)malloc(sizeof(cache_t));
+    newCache->lock = (pthread_mutex_t* )malloc(sizeof(pthread_mutex_t));
     newCache->ManagedMemory = (byte *)malloc(blockSize * blockCount);
 
     newCache->BlockCount = blockCount;
@@ -466,8 +467,9 @@ void CacheReport(cache_t * cache){
     }
 }
 
-void FlushDirtyBlocks(cache_t * cache){
-    while( CacheIsTooCrowded(cache) && EvictBlockToCache(cache) );
+void * FlushDirtyBlocks(void * cache){
+    while( CacheIsTooCrowded((cache_t*)cache) && EvictBlockToCache((cache_t*)cache) );
+    pthread_exit(0);
 }
 
 void SpawnHarvester(){
@@ -477,7 +479,7 @@ void SpawnHarvester(){
 void SpawnFlusher(cache_t * cache){
     pthread_t * hostThread = (pthread_t *)malloc(sizeof(pthread_t));
     int flusher = pthread_create(hostThread, NULL, FlushDirtyBlocks, (void*)cache);
-    pthread_join(hostThread, malloc(4));
+    pthread_join(*hostThread, malloc(4));
 }
 
 
@@ -494,8 +496,9 @@ int main(int argc, char* argv[]) {
     cache_t * cache = InitializeCache(blockSize, blockCount, highWaterMark, lowWaterMark);
     CacheReport(cache);
 
+    ReserveBlockInCache(cache, 1);
 
-
+    /*
 
     uint32_t i = 1;
     for(;i<=blockCount;i++){
@@ -560,7 +563,7 @@ int main(int argc, char* argv[]) {
     }
     CacheReport(cache);
 
-
+    */
 
     return 0;
 }
