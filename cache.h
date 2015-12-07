@@ -19,7 +19,7 @@ typedef struct cache {
     uint32_t HighWaterMark;
     uint32_t LowWaterMark;
 
-    block_list_t * DirtyList;
+    id_list_node_t * DirtyList;
     activity_table_t * ActivityTable;
     pthread_mutex_t *lock;
 

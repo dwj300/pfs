@@ -1,5 +1,104 @@
 #include "blockStructs.h"
 
+id_list_node_t * initializeIDListNode(global_block_id_t IDToEncapsulate){
+    if(IDToEncapsulate == BLOCK_IS_FREE){
+        fprintf(stderr, "You shouldn't be recording an ID indicating a free block into a list since they are not unique or idnetifying. n");
+        return NULL;
+    }
+
+    id_list_node_t * newIDListNode = (id_list_node_t *)malloc(sizeof(id_list_node_t));
+    if(!newIDListNode){
+        fprintf(stderr, "Allocation for the id list node failed.\n");
+        return NULL;
+    }
+
+    newIDListNode->id = IDToEncapsulate;
+    newIDListNode->next = NULL;
+    return newIDListNode;
+}
+
+
+bool destroyIDListNode(id_list_node_t * toDestroy){
+    if(!toDestroy){
+        fprintf(stderr, "You cannot destroy a null id list node.\n");
+        return false;
+    }
+    free(toDestroy);
+    return true;
+}
+
+
+bool addIDToIDList(id_list_node_t ** headOfTargetList, global_block_id_t newID){
+    if(!headOfTargetList){
+        fprintf(stderr, "No list to add to.\n");
+        return false;
+    }
+    id_list_node_t * sentinel = (*headOfTargetList);
+    if(!sentinel){
+        (*headOfTargetList) = initializeIDListNode(newID);
+        return true;
+    }
+    else{
+        while(sentinel){
+            if(!(sentinel->next)){
+                sentinel->next = initializeIDListNode(newID);
+                return true;
+            }
+            sentinel = sentinel->next;
+        }
+    }
+    return false;
+}
+
+
+bool removeIDFromIDList(id_list_node_t ** headOfTargetList, global_block_id_t toRemove){
+    if(!headOfTargetList){
+        fprintf(stderr, "No list to remove from.\n");
+        return false;
+    }
+    id_list_node_t * sentinel = (*headOfTargetList);
+    id_list_node_t * last = NULL;
+    if(!sentinel){
+            fprintf(stderr, "No list is empty, can't remove anything.\n");
+            return false;
+    }
+    else{
+        while(sentinel){
+            if(sentinel->id == toRemove){
+                if(last){
+                    last->next = sentinel->next;
+                }
+                else{
+                    (*headOfTargetList) = sentinel->next;
+                }
+                return destroyIDListNode(sentinel);
+            }
+            sentinel = sentinel->next;
+        }
+    }
+    return false;
+}
+
+
+global_block_id_t popIDFromIDList(id_list_node_t ** headOfTargetList){
+    if(!headOfTargetList){
+        fprintf(stderr, "No list to remove from.\n");
+        return BLOCK_IS_FREE;
+    }
+
+    id_list_node_t * head = (*headOfTargetList);
+
+    if(!head){
+        //fprintf(stderr, "List is empty.\n");
+        return BLOCK_IS_FREE;
+    }
+
+    (*headOfTargetList) = head->next;
+    global_block_id_t toReturn = head->id;
+    destroyIDListNode(head);
+    return toReturn;
+}
+
 block_list_node_t * initializeBlockListNode(block_t * toEncapsulate){
     if(!toEncapsulate){
         fprintf(stderr, "You must initialize a block before encapsulating it in a node.\n");
@@ -78,20 +177,6 @@ bool destroyBlock(block_t* toDeallocate) {
 }
 
 
-// bool resetBlock ???
-//A 'clear' block is effectively empty and free for population
-//  All blocks on the free list (and no other blocks) should be cleared
-//  Note that this is only reliable if called by a thread with a lock on the block
-bool blockIsCleared(block_t* block) {
-    if(!block) {
-        fprintf(stderr, "The block being checked does not exist.\n");
-        return false;
-    }
-    return (block->dirty && (block->id == BLOCK_IS_FREE));
-}
-
-
-
 block_mapping_node_t * initializeMappingNode(block_list_node_t * blockNodeBeingMapped){
     if(!blockNodeBeingMapped){
         fprintf(stderr, "You cannot initialize a mapping node without giving the block node it will map to.\n");
@@ -120,6 +205,21 @@ bool destroyMappingNode(block_mapping_node_t * toDestroy){
 }
 
 
+
+
+// bool resetBlock ???
+//A 'clear' block is effectively empty and free for population
+//  All blocks on the free list (and no other blocks) should be cleared
+//  Note that this is only reliable if called by a thread with a lock on the block
+bool blockIsCleared(block_t* block) {
+    if(!block) {
+        fprintf(stderr, "The block being checked does not exist.\n");
+        return false;
+    }
+    return (block->dirty && (block->id == BLOCK_IS_FREE));
+}
+
+
 bool addNodeToHeadOfList(block_list_t * targetList, block_list_node_t * newHead){
     if(!newHead){
         fprintf(stderr, "Block node doesn't exist, aborting block push\n");
@@ -145,7 +245,7 @@ bool addNodeToHeadOfList(block_list_t * targetList, block_list_node_t * newHead)
         if( newHead == targetList->tail){
             targetList->tail = targetList->tail->previous;
         }
-//BUG - in the case warned of above, the connection here includes a setting of next after the head... essentially it wont allow nodes to be in two lists atm
+//BUG - in the case warned of above, the connection here includes a setting of next after the head... essentially it wont allow nodes to be in two lists atmo
         //Connect the new head to the target queue
         newHead->next = targetList->head;
         targetList->head->previous = newHead;
