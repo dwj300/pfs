@@ -1,5 +1,5 @@
 C=gcc
-CFLAGS= -Wall
+CFLAGS= -Wall -g -pthread
 CFLAGS2= -lpthread -o
 
 all: c1 c2 c3 server client grapevine
@@ -23,7 +23,7 @@ client: client.c
 	$(CC) $(CFLAGS) $(CFLAGS2) client client.c
 
 cache: cache.c
-	$(CC) $(CFLAGS) $(CFLAGS2) cache cache.c blockStructs.c itoa.c
+	$(CC) cache.c blockStructs.c itoa.c -pthread -Wall -g -o cache
 
 test: test_program.c pfs.c
 	$(CC) $(CFLAGS) $(CFLAGS2) test test_program.c pfs.c
