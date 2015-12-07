@@ -1,7 +1,8 @@
 #include "dictionary.h"
 
 dictionary_t create_dictionary() {
-    return malloc(DICTSIZE * sizeof(entry_t*));
+    fprintf(stderr, "Initializing dictionary. Size:%lu bytes\n", (long unsigned)(DICTSIZE * sizeof(entry_t*)));
+    return calloc(DICTSIZE, sizeof(entry_t*));
 }
 
 unsigned hash(char *s) {
@@ -10,31 +11,27 @@ unsigned hash(char *s) {
     for (hashval = 0; *s != '\0'; s++) {
         hashval = *s + 31 * hashval;
     }
-    fprintf(stderr, "%u\n", hashval % DICTSIZE);
+    fprintf(stderr, "hash:%u\n", hashval % DICTSIZE);
     return hashval % DICTSIZE;
 }
 
 // iterate over the list at the hash of s and then strcmp
 // and attempt to find s
 entry_t* lookup(dictionary_t dict, char* s) {
-    fprintf(stderr, "here\n");
-    unsigned h = hash(s);
-    fprintf(stderr, "here12\n");
-    entry_t* e = dict[h];
-    fprintf(stderr, "here24\n");
-    fprintf(stderr, "foosdfsf");
+    entry_t* e;
     for (e = dict[hash(s)]; e != NULL; e = e->next) {
         if (strcmp(s, e->key) == 0) {
             return e;
         }
     }
     // If not found
-    fprintf(stderr, "hmm");
+    fprintf(stderr, "Key: %s not found\n", s);
 
     return NULL;
 }
 
 int insert(dictionary_t dict, char* key, void* data) {
+    fprintf(stderr, "Inserting key: %s\n", key);
     entry_t* e;
     unsigned hashval;
     // not found, create entry

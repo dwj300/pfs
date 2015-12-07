@@ -4,29 +4,43 @@
 int create_file(int socket_fd, char* filename, int stripe_width) {
     // Check if filename exists
     // Create it somehow...
-    fprintf(stderr, "f1\n");
 
     if (lookup(files, filename) != NULL) {
         fprintf(stderr, "File with name:%s already exists.\n", filename);
         int success = 0;
         write(socket_fd, &success, sizeof(int));
-        return -1;
+        return 0;
     }
     else {
-        fprintf(stderr, "f1\n");
         file_t* file = malloc(sizeof(file_t));
         file->filename = filename;
         insert(files, filename, file);
         int success = 1;
         write(socket_fd, &success, sizeof(int));
     }
-    //fprintf(stderr, "ERROR: not implemented yet\n");
-    //exit(1);
-    return 0;
+    return 1;
+}
+
+int delete_file(int socket_fd, char* filename) {
+    // Check if filename exists
+    entry_t* node = lookup(files, filename);
+    if (lookup(files, filename) == NULL) {
+        fprintf(stderr, "File with name:%s doesn't exist.\n", filename);
+        int success = 0;
+        write(socket_fd, &success, sizeof(int));
+        return 0;
+    }
+    else {
+        file_t* file = (file_t*)node->value;
+        // delete blocks off file servers
+        delete(files, filename);
+        int success = 1;
+        write(socket_fd, &success, sizeof(int));
+    }
+    return 1;
 }
 
 int fstat(char *filename) {
-
     fprintf(stderr, "ERROR: not implemented yet\n");
     exit(1);
     return 0;
@@ -40,17 +54,15 @@ int parse_args(char* buffer, char** opcode, void** data1, void** data2) {
         return -1;
     }
     strncpy(*opcode, buffer, (space - buffer));
-    fprintf(stderr, "hi4");
     space += sizeof(char);
-    fprintf(stderr, "hi5");
     char* next_space = strchr(space, ' ');
-    fprintf(stderr, "hi6");
     if (next_space != NULL) {
-        fprintf(stderr, "hi7");
         (*data1) = malloc(255 * sizeof(char));
-        fprintf(stderr, "hi8");
         strncpy(*data1, space, (next_space-space));
         (*data2) = (next_space + sizeof(char));
+    }
+    else {
+        (*data1) = space;
     }
     return 0;
 }
@@ -65,6 +77,7 @@ int main(int argc, char* argv[]) {
     else {
         port = atoi(argv[1]);
     }
+    files = create_dictionary();
     fprintf(stderr, "Metadata manager starting on port: %d\n", port);
 
     char buffer[2048];
@@ -119,14 +132,14 @@ int main(int argc, char* argv[]) {
             int stripe_width = atoi(stripe_str);
             create_file(newsockfd, filename, stripe_width);
         }
-
-        else if (strcmp(opcode, "FSTAT") == 0) {
-            //read_block(newsockfd, block_id);
+        else if (strcmp(opcode, "DELETE") == 0) {
+            char* filename = (char*)data1;
+            delete_file(newsockfd, filename);
         }/*
         else if (strcmp(opcode, "WRITE") == 0) {
             write_block(block_id, data);
         }
-        else if (strcmp(opcode, "DELETE") == 0) {
+        else if (strcmp(opcode, "FSTAT") == 0) {
             delete_block(block_id);
         }*/
         else {

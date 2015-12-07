@@ -76,7 +76,7 @@ int connect_socket(char *host, int port) {
          server->h_length);
     serv_addr.sin_port = htons(port);
     if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0) {
-        fprintf(stderr, "ERROR connecting");
+        fprintf(stderr, "ERROR connecting\n");
         return -1;
     }
 
