@@ -29,14 +29,30 @@ int connect_socket(char *host, int port) {
 
     return sockfd;
 }
-
+// assume 255 max filename
+// CREATE [filename] [strip] =
 int pfs_create(const char *filename, int stripe_width) {
+    int socket_fd = connect_socket(grapevine_host, grapevine_port);
+    if (socket_fd < 0) {
+        exit(1);
+    }
+    char* command = malloc(269*sizeof(char));
+    sprintf(command, "CREATE %s %d", filename, stripe_width);
+    fprintf(stderr, "COMMAND:\n");
+    fprintf(stderr, "%s\n", command);
+    int length = strlen(command);
+    write(socket_fd, command, length+1);
+    int success;
+    read(socket_fd, &success, sizeof(int));
+    fprintf(stderr, "success: %d\n", success);
+
+    close(socket_fd);
     return -1;
 }
 
 int pfs_open(const char *filename, const char mode) {
     // Connect to grapevine:
-    int socket_fd = connect_socket()
+    //int socket_fd = connect_socket()
 
     return -1;
 }
@@ -63,6 +79,6 @@ int pfs_fstat(int filedes, struct pfs_stat *buf) { // Check the config file for 
 
 void initialize(int argc, char **argv) {
     grapevine_host = "localhost";
-    grapevine_port = 9876;
+    grapevine_port = 9869;
     current_fd = 0;
 }

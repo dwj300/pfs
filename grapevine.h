@@ -8,4 +8,6 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include "sharedresources.h"
-#include "linkedlist.c"
+#include "dictionary.h"
+
+dictionary_t files;
