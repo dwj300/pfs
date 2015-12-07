@@ -9,11 +9,13 @@ bool CacheIsTooVacant(cache_t * cache){
 
 }
 
-
+//Should only be called if a lock on the block is held by the caller
+//Should only return true if successful and if toPush->dirty has been set to false
 bool pushBlockToServer(block_t* toPush) {
     //fprintf(stderr, "Pushing block to server\n");
     //fprintf(stderr, "ERROR: Not implemented yet\n");
     toPush->dirty = false;
+    //Check if block is the last in the file -> update stat
     return true; //for debugging
 }
 
@@ -29,6 +31,8 @@ activity_table_t * initializeActivityTable(byte * rawMemoryToManage, uint32_t bl
     if(!(newTable->AccessQueue) || !(newTable->FreeStack)){
         return NULL;
     }
+
+    newTable->lock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
 
     //Populate the cache with free blocks
     uint32_t i=0;
@@ -61,8 +65,8 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
     }
 
     cache_t * newCache = (cache_t*)malloc(sizeof(cache_t));
-    newCache->lock = (pthread_mutex_t* )malloc(sizeof(pthread_mutex_t));
     newCache->ManagedMemory = (byte *)malloc(blockSize * blockCount);
+
 
     newCache->BlockCount = blockCount;
     newCache->BlockSize = blockSize;
@@ -72,6 +76,8 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
     newCache->BlockSize = blockSize;
 
     newCache->DirtyList = NULL;
+    newCache->DirtyListLock = (pthread_mutex_t *)malloc(sizeof(pthread_mutex_t));
+
     newCache->ActivityTable = initializeActivityTable(newCache->ManagedMemory, blockCount, blockSize);
     return newCache;
 }
@@ -181,7 +187,7 @@ block_t * ReadBlockFromCache(cache_t* cache, global_block_id_t targetBlock) {
         fprintf(stderr, "The cache object has no been properly initialized\n");
     }
 
-    pthread_mutex_lock(cache->lock);
+    pthread_mutex_lock(cache->ActivityTable->lock);
 
     //Look into activity table and attempt to find target block
     block_list_node_t * hostingCacheNode = findBlockNodeInAccessQueue(cache->ActivityTable, targetBlock);
@@ -189,11 +195,11 @@ block_t * ReadBlockFromCache(cache_t* cache, global_block_id_t targetBlock) {
         //I the block is already active in the cache we need to note that the block was just referenced by
         //  moving it to the head of the access queue (from wherever in the access queue it currently is)
         addNodeToHeadOfList(cache->ActivityTable->AccessQueue, hostingCacheNode);
-        pthread_mutex_unlock(cache->lock);
+        pthread_mutex_unlock(cache->ActivityTable->lock);
         return hostingCacheNode->block;
     }
     else{
-        pthread_mutex_unlock(cache->lock);
+        pthread_mutex_unlock(cache->ActivityTable->lock);
         return NULL;
     }
 }
@@ -204,7 +210,7 @@ block_t * ReserveBlockInCache(cache_t* cache, global_block_id_t blockToReserveFo
         fprintf(stderr, "The cache object has no been properly initialized\n");
     }
 
-    pthread_mutex_lock(cache->lock);
+    pthread_mutex_lock(cache->ActivityTable->lock);
 
     //Look into activity table and attempt to find target block
     block_list_node_t * freeNode = removeNodeFromHeadOfList(cache->ActivityTable->FreeStack);
@@ -216,11 +222,11 @@ block_t * ReserveBlockInCache(cache_t* cache, global_block_id_t blockToReserveFo
         addBlockMapping(cache->ActivityTable, freeNode);
         addNodeToHeadOfList(cache->ActivityTable->AccessQueue, freeNode);
         cache->Occupancy++;
-        pthread_mutex_unlock(cache->lock);
+        pthread_mutex_unlock(cache->ActivityTable->lock);
         return freeNode->block;
     }
     else{
-        pthread_mutex_unlock(cache->lock);
+        pthread_mutex_unlock(cache->ActivityTable->lock);
         return NULL;
     }
 }
@@ -232,28 +238,41 @@ bool ReleaseBlockToCache(cache_t* cache, global_block_id_t blockToRelease) {
         return false;
     }
 
-    pthread_mutex_lock(cache->lock);
-
     //Look into activity table and find the block node holding the block to be released
     block_list_node_t * hostingNode = findBlockNodeInAccessQueue(cache->ActivityTable, blockToRelease);
     if( !hostingNode ){
         fprintf(stderr, "The block is not in the access queue.\n");
         return false;
     }
+    block_t * toRelease = hostingNode->block;
+
+    //Clear the block / write back if needed
+    pthread_mutex_lock(toRelease->lock);
+    if( (hostingNode->block->dirty) ){
+        if( !pushBlockToServer(hostingNode->block) ){
+            return false;
+        }
+        else{
+            pthread_mutex_lock(cache->DirtyListLock);
+            if( !removeIDFromIDList(&(cache->DirtyList), blockToRelease) ){
+                fprintf(stderr, "A dirty block was written back to the server, but it was not cleared from the dirty list.\n");
+                pthread_mutex_unlock(cache->DirtyListLock);
+            }
+            else{
+                pthread_mutex_unlock(cache->DirtyListLock);
+            }
+        }
+    }
+    hostingNode->block->id = BLOCK_IS_FREE;
+    pthread_mutex_unlock(toRelease->lock);
+
+
+    pthread_mutex_lock(cache->ActivityTable->lock);
 
     //Remove the node from the access queue and the activity table
     if(!removeNodeFromList(cache->ActivityTable->AccessQueue, hostingNode) || !removeBlockMapping(cache->ActivityTable, hostingNode) ){
         return false;
     }
-
-    //Clear the block / write back if needed
-    if( (hostingNode->block->dirty) ){
-        if( !pushBlockToServer(hostingNode->block) || !removeIDFromIDList(&(cache->DirtyList), blockToRelease)){
-            return false;
-        }
-    }
-    hostingNode->block->id = BLOCK_IS_FREE;
-
 
     //Add the node to the free stack
     if(!addNodeToHeadOfList(cache->ActivityTable->FreeStack, hostingNode)){
@@ -262,7 +281,7 @@ bool ReleaseBlockToCache(cache_t* cache, global_block_id_t blockToRelease) {
     cache->Occupancy--;
 
 
-    pthread_mutex_unlock(cache->lock);
+    pthread_mutex_unlock(cache->ActivityTable->lock);
     return true;
 }
 
@@ -273,38 +292,48 @@ bool EvictBlockToCache(cache_t* cache){
         return false;
     }
 
-    pthread_mutex_lock(cache->lock);
-
+    pthread_mutex_lock(cache->ActivityTable->lock);
     //Remove the node from the access queue and the activity table
     block_list_node_t* toEvict = removeNodeFromTailOfList(cache->ActivityTable->AccessQueue);
     if(!toEvict || !removeBlockMapping(cache->ActivityTable, toEvict) ){
+        pthread_mutex_unlock(cache->ActivityTable->lock);
         return false;
     }
+    pthread_mutex_unlock(cache->ActivityTable->lock);
 
     //Clear the block / write back if needed
-    if( (toEvict->block->dirty) ){
-        if( !pushBlockToServer(toEvict->block) || !removeIDFromIDList(&(cache->DirtyList), toEvict->block->id)){
+    block_t * toRelease = toEvict->block;
+    pthread_mutex_lock(toRelease->lock);
+    if( (toRelease->dirty) ){
+        if( !pushBlockToServer(toRelease) ){
+            pthread_mutex_unlock(toRelease->lock);
             return false;
         }
+        else{
+            pthread_mutex_lock(cache->DirtyListLock);
+            if( !removeIDFromIDList(&(cache->DirtyList), toRelease->id) ){
+                fprintf(stderr, "A dirty block was written back to the server, but it was not cleared from the dirty list.\n");
+                pthread_mutex_unlock(cache->DirtyListLock);
+            }
+            else{
+                pthread_mutex_unlock(cache->DirtyListLock);
+            }
+        }
     }
-    toEvict->block->id = BLOCK_IS_FREE;
+    toRelease->id = BLOCK_IS_FREE;
+    pthread_mutex_unlock(toRelease->lock);
 
-
+    pthread_mutex_lock(cache->ActivityTable->lock);
     //Add the node to the free stack
     if(!addNodeToHeadOfList(cache->ActivityTable->FreeStack, toEvict)){
+        pthread_mutex_unlock(cache->ActivityTable->lock);
         return false;
     }
     cache->Occupancy--;
+    pthread_mutex_unlock(cache->ActivityTable->lock);
 
-
-    pthread_mutex_unlock(cache->lock);
     return true;
 }
-
-
-
-
-
 
 
 //Place the given data into the given block, with the specified global block id
@@ -362,44 +391,32 @@ bool FetchBlockFromServer(cache_t* targetCache, global_block_id_t idOfBlockToFet
 
 
 bool MarkBlockDirty(cache_t* cache, global_block_id_t targetBlock) {
-    pthread_mutex_lock(cache->lock);
-    block_list_node_t * toMark = findBlockNodeInAccessQueue(cache->ActivityTable, targetBlock);
-    if(!toMark) {
-        pthread_mutex_unlock(cache->lock);
+    block_list_node_t * hostingNode = findBlockNodeInAccessQueue(cache->ActivityTable, targetBlock);
+    if(!hostingNode) {
         return false;
     }
     else {
-        if(toMark->block->dirty){
+        block_t * toMark = hostingNode->block;
+        pthread_mutex_lock(toMark->lock);
+        if(toMark->dirty){
             fprintf(stderr, "WARN: block was already dirty\n");
+            pthread_mutex_unlock(toMark->lock);
             return true;
         }
+        toMark->dirty = true;
+        pthread_mutex_unlock(toMark->lock);
 
-        //CONCERN: what if multiple lock contentions are served in non-fifo order?
-        toMark->block->dirty = true;
-
+        pthread_mutex_lock(cache->DirtyListLock);
         //Add to dirty list
         if( !addIDToIDList(&(cache->DirtyList), targetBlock) ){
-            pthread_mutex_unlock(cache->lock);
+            pthread_mutex_unlock(cache->DirtyListLock);
             return false;
         }
-        pthread_mutex_unlock(cache->lock);
-        return true;
+        else{
+            pthread_mutex_unlock(cache->DirtyListLock);
+        }
     }
-}
-
-bool BlockIsDirty(cache_t* cache, global_block_id_t targetBlock) {
-    block_t* toCheck = GetBlock(cache, targetBlock);
-    if(!toCheck) {
-        return false;
-    }
-    else {
-        //CONCERN: what if multiple lock contentions are served in non-fifo order?
-	    //CONCERN: what if dirty state changes after releasing the lock and returning?
-        pthread_mutex_lock(toCheck->lock);
-        // bool state = toCheck->dirty;
-        pthread_mutex_unlock(toCheck->lock);
-        return true;
-    }
+    return true;
 }
 
 
@@ -473,26 +490,44 @@ void CacheReport(cache_t * cache){
     }
 }
 
+
 void * FlushDirtyBlocks(void * cache){
     fprintf(stderr, "Starting flushing. \n");
     int flushed = 0;
     cache_t * hostCache = (cache_t*)cache;
+
+    pthread_mutex_lock(hostCache->DirtyListLock);
     global_block_id_t currentTarget = popIDFromIDList( &(hostCache->DirtyList) );
-    while(currentTarget != 0){
+    pthread_mutex_unlock(hostCache->DirtyListLock);
+
+    while(currentTarget != BLOCK_IS_FREE){
         block_list_node_t * hostingNode = findBlockNodeInAccessQueue(hostCache->ActivityTable, currentTarget);
-        if (hostingNode){
-            if(!pushBlockToServer(hostingNode->block)){
+
+        if(!hostingNode){
+            fprintf(stderr, "WARN: Block referenced by the dirty list was not found to be active in the cache. Cache is likely corrupt. \n");
+        }
+        else{
+            block_t * blockToFlush = hostingNode->block;
+            pthread_mutex_lock(blockToFlush->lock);
+            if( !blockToFlush->dirty ){
+                fprintf(stderr, "WARN: Block referenced by the dirty list was found to be clean in the cache. Cache is likely corrupt. \n");
+                pthread_mutex_unlock(blockToFlush->lock);
+            }
+            else if(!pushBlockToServer(hostingNode->block)){
                 //if a push fails, might as well allow a retry later
-                addIDToIDList( &(hostCache->DirtyList) , currentTarget);
+                pthread_mutex_lock(hostCache->DirtyListLock);
+                addIDToIDList( &(hostCache->DirtyList), currentTarget);
+                pthread_mutex_unlock(hostCache->DirtyListLock);
+                pthread_mutex_unlock(blockToFlush->lock);
             }
             else{
                 flushed++;
+                pthread_mutex_unlock(blockToFlush->lock);
             }
         }
-        else{
-            fprintf(stderr, "WARN: Block referenced by the dirty list was not found to be active in the cache. Cache is likely corrupt. \n");
-        }
+        pthread_mutex_lock(hostCache->DirtyListLock);
         currentTarget = popIDFromIDList( &(hostCache->DirtyList) );
+        pthread_mutex_unlock(hostCache->DirtyListLock);
     }
     printUInt(flushed);
     fprintf(stderr, " blocks flushed.\n");
@@ -514,13 +549,17 @@ void * Harvest(void * cache){
     pthread_exit(0);
 }
 
+
+
 void SpawnHarvester(cache_t * cache){
     pthread_t * hostThread = (pthread_t *)malloc(sizeof(pthread_t));
-    //int harvester = 
+    //int harvester =
     pthread_create(hostThread, NULL, Harvest, (void*)cache);
     pthread_join(*hostThread, malloc(4));
     fprintf(stderr, "Done harvesting. \n");
 }
+
+
 
 void SpawnFlusher(cache_t * cache){
     pthread_t * hostThread = (pthread_t *)malloc(sizeof(pthread_t));

@@ -99,6 +99,7 @@ global_block_id_t popIDFromIDList(id_list_node_t ** headOfTargetList){
     return toReturn;
 }
 
+
 block_list_node_t * initializeBlockListNode(block_t * toEncapsulate){
     if(!toEncapsulate){
         fprintf(stderr, "You must initialize a block before encapsulating it in a node.\n");
@@ -232,7 +233,7 @@ bool addNodeToHeadOfList(block_list_t * targetList, block_list_node_t * newHead)
     //Sanity checks
     if(newHead->previous || newHead->next){
         newHead->previous = newHead->next = NULL;
-        fprintf(stderr, "WARN: adding a previously-linked node to a list, it's previous host list might be broken\n");
+        fprintf(stderr, "WARN: adding a previously-linked node to a list, it's previous host list is likely now broken\n");
     }
 
     //If we're inserting into an empty list
@@ -245,7 +246,6 @@ bool addNodeToHeadOfList(block_list_t * targetList, block_list_node_t * newHead)
         if( newHead == targetList->tail){
             targetList->tail = targetList->tail->previous;
         }
-//BUG - in the case warned of above, the connection here includes a setting of next after the head... essentially it wont allow nodes to be in two lists atmo
         //Connect the new head to the target queue
         newHead->next = targetList->head;
         targetList->head->previous = newHead;
