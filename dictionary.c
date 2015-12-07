@@ -44,7 +44,9 @@ int insert(dictionary_t dict, char* key, void* data) {
         }
         hashval = hash(key);
         e->next = dict[hashval];
+        e->next->prev = e;
         e->value = data;
+        e->prev = NULL;
         dict[hashval] = e;
     }
     // key found
@@ -57,8 +59,25 @@ int insert(dictionary_t dict, char* key, void* data) {
 }
 
 int delete(dictionary_t dict, char* key) {
-    fprintf(stderr, "ERROR: not implemented yet\n");
-    exit(1);
+    fprintf(stderr, "deleting: %s\n", key);
+    entry_t *e = lookup(dict, key);
+    if (e == NULL) {
+        fprintf(stderr, "key not found\n");
+        return -1;
+    }    
+    // find previous node, if it exists
+    if(e->prev != NULL) {
+        e->prev->next = e->next;
+    }
+
+    if(e->next != NULL) {
+        e->next->prev = e->prev;
+    }
+    // User is responsible for freeing their own data!
+    free(e->value);
+    free(e->key);
+    free(e);
+    return 0;
 }
 
 void dictionary_print(dictionary_t dict) {

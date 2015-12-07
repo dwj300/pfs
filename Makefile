@@ -1,17 +1,17 @@
 C=gcc
-CFLAGS= -Wall -g -pthread
-CFLAGS2= -lpthread -o
+CFLAGS= -Wall -g
+CFLAGS2= -pthread -o
 
-all: c1 c2 c3 server client grapevine
+all: c1 c2 c3 server client grapevine cache test
 
-c1: pfs.c test1-c1.c
-	$(CC) $(CFLAGS) $(CFLAGS2) c1 pfs.c test1-c1.c
+c1: pfs.c test1-c1.c cache.c blockStructs.c
+	$(CC) $(CFLAGS) $(CFLAGS2) c1 pfs.c test1-c1.c cache.c blockStructs.c
 
-c2: pfs.c test1-c2.c
-	$(CC) $(CFLAGS) $(CFLAGS2) c2 pfs.c test1-c2.c
+c2: pfs.c test1-c2.c cache.c blockStructs.c
+	$(CC) $(CFLAGS) $(CFLAGS2) c2 pfs.c test1-c2.c cache.c blockStructs.c
 
-c3: pfs.c test1-c3.c
-	$(CC) $(CFLAGS) $(CFLAGS2) c3 pfs.c test1-c3.c
+c3: pfs.c test1-c3.c cache.c blockStructs.c
+	$(CC) $(CFLAGS) $(CFLAGS2) c3 pfs.c test1-c3.c cache.c blockStructs.c
 
 server: server.c
 	$(CC) $(CFLAGS) $(CFLAGS2) server server.c
@@ -22,11 +22,11 @@ grapevine: grapevine.c dictionary.c
 client: client.c
 	$(CC) $(CFLAGS) $(CFLAGS2) client client.c
 
-cache: cache.c
-	$(CC) cache.c blockStructs.c -pthread -Wall -g -o cache
+test: test_program.c pfs.c cache.c blockStructs.c
+	$(CC) $(CFLAGS) $(CFLAGS2) test test_program.c pfs.c cache.c blockStructs.c
 
-test: test_program.c pfs.c
-	$(CC) $(CFLAGS) $(CFLAGS2) test test_program.c pfs.c
+cache: test_cache.c cache.c blockStructs.c
+	$(CC) $(CFLAGS) $(CFLAGS2) test_cache test_cache.c cache.c blockStructs.c
 
 clean:
-	rm c1 c2 c3 client server cache grapevine
+	rm c1 c2 c3 client server cache grapevine test

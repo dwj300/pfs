@@ -6,6 +6,7 @@
 
 typedef struct entry {
     struct entry* next;
+    struct entry* prev;
     char* key;
     void* value;
 } entry_t;

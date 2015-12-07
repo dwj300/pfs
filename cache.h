@@ -1,4 +1,5 @@
 #include "blockStructs.h"
+#define CACHE_MAP_SECTOR_COUNT 8
 
 typedef int32_t file_desc_t;
 typedef int32_t offset_t;
@@ -38,3 +39,4 @@ block_t * GetBlock(cache_t* cache, global_block_id_t targetBlock);
 bool ReleaseBlock(global_block_id_t targetBlock);
 bool MarkBlockDirty(cache_t *cache, global_block_id_t targetBlock);
 bool BlockIsDirty(cache_t *cache, global_block_id_t targetBlock);
+void test_cache(int argc, char* argv[]);

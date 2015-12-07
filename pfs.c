@@ -61,7 +61,7 @@ int pfs_open(const char *filename, const char mode) {
     fprintf(stderr, "COMMAND: %s\n", command);
     int length = strlen(command);
     write(socket_fd, command, length+1); // +1 for null terminator. Not sure if needed
-    //read(socket_fd, &success, sizeof(int)); 
+    //read(socket_fd, &success, sizeof(int));
     // TODO ???
     close(socket_fd);
     return -1;
@@ -99,6 +99,7 @@ int pfs_delete(const char *filename) {
 }
 
 int pfs_fstat(int filedes, struct pfs_stat *buf) { // Check the config file for the definition of pfs_stat structure
+ // must have a read token for last token in file
     return -1;
 }
 
@@ -106,4 +107,5 @@ void initialize(int argc, char **argv) {
     grapevine_host = "localhost";
     grapevine_port = 9876;
     current_fd = 0;
+    cache = InitializeCache(PFS_BLOCK_SIZE * 1024, 2048, 80, 20);
 }

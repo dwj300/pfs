@@ -1,6 +1,4 @@
 #include "cache.h"
-#define CACHE_MAP_SECTOR_COUNT 8
-#include "itoa.h"
 
 bool CacheIsTooCrowded(cache_t * cache){
     return (cache->Occupancy > cache->HighWaterMark);
@@ -442,7 +440,7 @@ char * itoaWrapUn(uint32_t input){
 
 void printUInt(uint32_t input){
     char * toPrint = itoaWrapUn(input);
-    fprintf(stderr, toPrint);
+    fprintf(stderr, "%s", toPrint);
     free(toPrint);
 }
 
@@ -555,7 +553,8 @@ void * Harvest(void * cache){
 
 void SpawnHarvester(cache_t * cache){
     pthread_t * hostThread = (pthread_t *)malloc(sizeof(pthread_t));
-    int harvester = pthread_create(hostThread, NULL, Harvest, (void*)cache);
+    //int harvester = 
+    pthread_create(hostThread, NULL, Harvest, (void*)cache);
     pthread_join(*hostThread, malloc(4));
     fprintf(stderr, "Done harvesting. \n");
 }
@@ -564,14 +563,14 @@ void SpawnHarvester(cache_t * cache){
 
 void SpawnFlusher(cache_t * cache){
     pthread_t * hostThread = (pthread_t *)malloc(sizeof(pthread_t));
-    int flusher = pthread_create(hostThread, NULL, FlushDirtyBlocks, (void*)cache);
+    pthread_create(hostThread, NULL, FlushDirtyBlocks, (void*)cache); //int flusher = ?
     pthread_join(*hostThread, malloc(4));
     fprintf(stderr, "Done flushing. \n");
 }
 
 
 
-int main(int argc, char* argv[]) {
+void test_cache(int argc, char* argv[]) {
 
     //Smoke tests
 
@@ -683,9 +682,6 @@ int main(int argc, char* argv[]) {
         EvictBlockToCache(cache);
     }
 */
-
-
-    return 0;
 }
 
 
