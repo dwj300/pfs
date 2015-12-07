@@ -2,14 +2,14 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
+#include "sharedresources.h"
 
 typedef int32_t file_desc_t;
 typedef int32_t offset_t;
 typedef char byte;
 
 // General struct definitions
-typedef struct block
-{
+typedef struct block{
     global_block_id_t id;
     pthread_mutex_t *lock;
     bool dirty;
@@ -18,10 +18,10 @@ typedef struct block
 
 //Block Access Methods
 block_t * initializeBlock();
+bool destroyBlock(block_t* toDeallocate);
 
 
-
-typedef struct block_list_node {
+typedef struct block_list_node{
     block_t * block;
     struct block_list_node * previous;
     struct block_list_node * next;
@@ -30,10 +30,27 @@ typedef struct block_list_node {
 block_list_node_t * initializeBlockListNode();
 
 
+typedef struct block_mapping_node{
+    block_list_node_t * mappedBlockNode;
+    struct block_mapping_node * next;
+} block_mapping_node_t;
 
-typedef struct block_list {
-    struct block_list_node * head;
-    struct block_list_node * tail;
+block_mapping_node_t * initializeMappingNode(block_list_node_t * blockNodeBeingMapped);
+bool destroyMappingNode(block_mapping_node_t * toDestroy);
+
+
+typedef struct block_list{
+    block_list_node_t* head;
+    block_list_node_t * tail;
 } block_list_t;
 
 block_list_t * initializeBlockList();
+
+
+bool addNodeToHeadOfList(block_list_t * targetList, block_list_node_t * newHead);
+bool blockIsCleared(block_t* block);
+block_list_node_t * removeNodeFromHeadOfList(block_list_t * sourceList);
+block_list_node_t * removeNodeFromTailOfList(block_list_t * sourceList);
+block_list_node_t * removeNodeFromListByID(block_list_t * hostList, global_block_id_t IDOfBlockToRemove);
+bool removeNodeFromList(block_list_t * hostList, block_list_node_t * toRemove);
+
