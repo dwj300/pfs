@@ -1,4 +1,5 @@
 #include "blockStructs.h"
+#define CACHE_MAP_SECTOR_COUNT 8
 
 typedef int32_t file_desc_t;
 typedef int32_t offset_t;

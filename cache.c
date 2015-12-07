@@ -1,6 +1,4 @@
 #include "cache.h"
-#define CACHE_MAP_SECTOR_COUNT 8
-#include "itoa.h"
 
 bool CacheIsTooCrowded(cache_t * cache){
     return (cache->Occupancy > cache->HighWaterMark);
@@ -518,7 +516,8 @@ void * Harvest(void * cache){
 
 void SpawnHarvester(cache_t * cache){
     pthread_t * hostThread = (pthread_t *)malloc(sizeof(pthread_t));
-    int harvester = pthread_create(hostThread, NULL, Harvest, (void*)cache);
+    //int harvester = 
+    pthread_create(hostThread, NULL, Harvest, (void*)cache);
     pthread_join(*hostThread, malloc(4));
     fprintf(stderr, "Done harvesting. \n");
 }
