@@ -1,5 +1,5 @@
 C=gcc
-CFLAGS= -Wall
+CFLAGS= -Wall -g
 CFLAGS2= -lpthread -o
 
 all: c1 c2 c3 server client grapevine

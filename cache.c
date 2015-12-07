@@ -11,10 +11,18 @@ bool CacheIsTooVacant(cache_t * cache){
 }
 
 
+bool pushBlockToServer(block_t* toPush) {
+    fprintf(stderr, "Pushing block to server");
+    fprintf(stderr, "ERROR: Not implemented yet\n");
+    exit(1);
+    return true; //for debugging
+}
+
+
 activity_table_t * initializeActivityTable(byte * rawMemoryToManage, uint32_t blockCount, uint32_t blockSize){
     activity_table_t * newTable = (activity_table_t *)malloc(sizeof(activity_table_t));
     if(!newTable){
-        fprintf(stderr, "Memory allocation for activity table failed.");
+        fprintf(stderr, "Memory allocation for activity table failed.\n");
         return NULL;
     }
 
@@ -31,7 +39,7 @@ activity_table_t * initializeActivityTable(byte * rawMemoryToManage, uint32_t bl
         block_list_node_t * newBlockNode = initializeBlockListNode(newBlock);
         if(newBlockNode){
             if( !addNodeToHeadOfList(newTable->FreeStack, newBlockNode)){
-                fprintf(stderr, "Node could not be added to the free stack during activity table initialization.");
+                fprintf(stderr, "Node could not be added to the free stack during activity table initialization.\n");
                 return NULL;
             }
         }
@@ -41,8 +49,6 @@ activity_table_t * initializeActivityTable(byte * rawMemoryToManage, uint32_t bl
     }
 
     newTable->ActiveBlockMap = (block_mapping_node_t **)malloc(sizeof(block_mapping_node_t *) * CACHE_MAP_SECTOR_COUNT);
-    if(newTable->ActiveBlockMap)
-        fprintf(stderr, "got here.\n");
     for(i=0;i<CACHE_MAP_SECTOR_COUNT;i++){
             newTable->ActiveBlockMap[i] = NULL;
     }
@@ -52,7 +58,7 @@ activity_table_t * initializeActivityTable(byte * rawMemoryToManage, uint32_t bl
 
 cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWaterMarkPercent, float lowWaterMarkPercent) {
     if( highWaterMarkPercent > 100.0F || highWaterMarkPercent < 0.0F || lowWaterMarkPercent > 100.0F || lowWaterMarkPercent < 0.0F || highWaterMarkPercent < lowWaterMarkPercent){
-        fprintf(stderr, "Malformated or illogical cache cleanup parameters (for low and/or high water mark).");
+        fprintf(stderr, "Malformated or illogical cache cleanup parameters (for low and/or high water mark).\n");
         return NULL;
     }
 
@@ -62,8 +68,8 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
     newCache->BlockCount = blockCount;
     newCache->BlockSize = blockSize;
 
-    newCache->HighWaterMark = (uint32_t)(highWaterMarkPercent*blockCount);
-    newCache->LowWaterMark = (uint32_t)(lowWaterMarkPercent*blockCount);
+    newCache->HighWaterMark = (uint32_t)((highWaterMarkPercent/100)*blockCount);
+    newCache->LowWaterMark = (uint32_t)((lowWaterMarkPercent/100)*blockCount);
     newCache->BlockSize = blockSize;
 
     newCache->DirtyList = initializeBlockList();
@@ -93,11 +99,11 @@ block_list_node_t * findBlockNodeInAccessQueue(activity_table_t * activityTable,
 //Should only be called for active blocks (just added the access queue)
 bool addBlockMapping(activity_table_t * hostTable, block_list_node_t * toAdd){
     if(!hostTable) {
-        fprintf(stderr, "The hosting activity table has no been properly initialized");
+        fprintf(stderr, "The hosting activity table has no been properly initialized.\n");
         return false;
     }
-    if(!toAdd ||!(toAdd->block->id == BLOCK_IS_FREE)) {
-        fprintf(stderr, "You must fully initialize and assign a block to a block node before creating a mapping for it.");
+    if(!toAdd || (toAdd->block->id == BLOCK_IS_FREE)) {
+        fprintf(stderr, "You must fully initialize and assign a block to a block node before creating a mapping for it.\n");
         return false;
     }
 
@@ -130,11 +136,11 @@ bool addBlockMapping(activity_table_t * hostTable, block_list_node_t * toAdd){
 //Should only be called for freed blocks (just removed the access queue)
 bool removeBlockMapping(activity_table_t * hostTable, block_list_node_t * toRemove){
     if(!hostTable) {
-        fprintf(stderr, "The hosting activity table has no been properly initialized");
+        fprintf(stderr, "The hosting activity table has no been properly initialized\n");
         return false;
     }
-    if(!toRemove ||!(toRemove->block->id != BLOCK_IS_FREE)) {
-        fprintf(stderr, "You cannot remove a mapping is fully initialize and assign a block to a block node before creating a mapping for it.");
+    if(!toRemove) {
+        fprintf(stderr, "You cannot remove a mapping for a NULL block.\n");
         return false;
     }
 
@@ -148,6 +154,9 @@ bool removeBlockMapping(activity_table_t * hostTable, block_list_node_t * toRemo
             if(last){
                 last->next = sentinel->next;
             }
+            else{
+                hostTable->ActiveBlockMap[targetSector] = sentinel->next;
+            }
             if(!destroyMappingNode(sentinel)){
                 return false; //destructor will print err msg
             }
@@ -155,13 +164,14 @@ bool removeBlockMapping(activity_table_t * hostTable, block_list_node_t * toRemo
         }
         sentinel = sentinel->next;
     }
-    fprintf(stderr, "Block node was not mapped in the table.");
+    if(sentinel)
+    fprintf(stderr, "Block node was not mapped in the table.\n");
     return false;
 }
 
 
 block_t * GetBlock(cache_t* cache, global_block_id_t targetBlock) {
-    fprintf(stderr, "ERROR: Not implemented yet.");
+    fprintf(stderr, "ERROR: Not implemented yet.\n");
     exit(1);
     return NULL;
 }
@@ -169,7 +179,7 @@ block_t * GetBlock(cache_t* cache, global_block_id_t targetBlock) {
 
 block_t * ReadBlockFromCache(cache_t* cache, global_block_id_t targetBlock) {
     if(!cache || !(cache->ActivityTable)) {
-        fprintf(stderr, "The cache object has no been properly initialized");
+        fprintf(stderr, "The cache object has no been properly initialized\n");
     }
 
     pthread_mutex_lock(cache->lock);
@@ -192,7 +202,7 @@ block_t * ReadBlockFromCache(cache_t* cache, global_block_id_t targetBlock) {
 
 block_t * ReserveBlockInCache(cache_t* cache, global_block_id_t blockToReserveFor) {
     if(!cache || !(cache->ActivityTable)) {
-        fprintf(stderr, "The cache object has no been properly initialized");
+        fprintf(stderr, "The cache object has no been properly initialized\n");
     }
 
     pthread_mutex_lock(cache->lock);
@@ -206,6 +216,7 @@ block_t * ReserveBlockInCache(cache_t* cache, global_block_id_t blockToReserveFo
         //The block needs to be added to the access queue and recorded in the active block map
         addBlockMapping(cache->ActivityTable, freeNode);
         addNodeToHeadOfList(cache->ActivityTable->AccessQueue, freeNode);
+        cache->Occupancy++;
         pthread_mutex_unlock(cache->lock);
         return freeNode->block;
     }
@@ -216,46 +227,78 @@ block_t * ReserveBlockInCache(cache_t* cache, global_block_id_t blockToReserveFo
 }
 
 
-
-
-bool evictFromReferenceQueue(activity_table_t * hostTable){
-/*    if(!hostTable) {
-        fprintf(stderr, "You cannot evict within a NULL table.");
-        return false;
-    }
-    if(!(hostTable->headOfReferenceQueue) || !(hostTable->tailOfReferenceQueue)) {
-        fprintf(stderr, "You cannot evict from a table with no active blocks.");
+bool ReleaseBlockToCache(cache_t* cache, global_block_id_t blockToRelease) {
+    if(!cache || !(cache->ActivityTable)) {
+        fprintf(stderr, "The cache object has no been properly initialized\n");
         return false;
     }
 
-    block_list_node_t* toEvict = hostTable->tailOfReferenceQueue;
-    toEvict->previous = NULL;
-    toEvict->next = NULL;
+    pthread_mutex_lock(cache->lock);
 
-    //If the node was the only one in the reference queue, the ref. q. is now empty
-    if(hostTable->headOfReferenceQueue == hostTable->tailOfReferenceQueue){
-        hostTable->headOfReferenceQueue = hostTable->tailOfReferenceQueue = NULL;
-    }
-    else{
-        //Otherwise, the ref. q. just has a new tail
-        hostTable->tailOfReferenceQueue = hostTable->tailOfReferenceQueue->previous;
-        hostTable->tailOfReferenceQueue->next = NULL;
+    //Look into activity table and find the block node holding the block to be released
+    block_list_node_t * hostingNode = findBlockNodeInAccessQueue(cache->ActivityTable, blockToRelease);
+    if( !hostingNode ){
+        fprintf(stderr, "The block is not in the access queue.\n");
+        return false;
     }
 
-    //If the free stack is empty, the evicted block will be the only member of the free stack
-    if(!(hostTable->headOfFreeStack)){
-        hostTable->headOfFreeStack = toEvict;
-    }
-    else{
-        //Otherwise we must reconnect the old free stack to the new one
-        toEvict->next = headOfFreeStack;
-        hostTable->headOfFreeStack->previous = toEvict
-        hostTable->headOfFreeStack = toEvict;
+    //Remove the node from the access queue and the activity table
+    if(!removeNodeFromList(cache->ActivityTable->AccessQueue, hostingNode) || !removeBlockMapping(cache->ActivityTable, hostingNode) ){
+        return false;
     }
 
-    //Remove the reference from the map into the queue
-    removeFromMap(activity_table_t * )
-*/
+    //Clear the block / write back if needed
+    if( (hostingNode->block->dirty) ){
+        if( !pushBlockToServer(hostingNode->block) || !removeNodeFromList(cache->DirtyList, hostingNode)){
+            return false;
+        }
+    }
+    hostingNode->block->id = BLOCK_IS_FREE;
+
+
+    //Add the node to the free stack
+    if(!addNodeToHeadOfList(cache->ActivityTable->FreeStack, hostingNode)){
+        return false;
+    }
+    cache->Occupancy--;
+
+
+    pthread_mutex_unlock(cache->lock);
+    return true;
+}
+
+
+bool EvictBlockToCache(cache_t* cache){
+    if(!cache) {
+        fprintf(stderr, "You cannot evict within a NULL cache.");
+        return false;
+    }
+
+    pthread_mutex_lock(cache->lock);
+
+    //Remove the node from the access queue and the activity table
+    block_list_node_t* toEvict = removeNodeFromTailOfList(cache->ActivityTable->AccessQueue);
+    if(!toEvict || !removeBlockMapping(cache->ActivityTable, toEvict) ){
+        return false;
+    }
+
+    //Clear the block / write back if needed
+    if( (toEvict->block->dirty) ){
+        if( !pushBlockToServer(toEvict->block) || !removeNodeFromList(cache->DirtyList, toEvict)){
+            return false;
+        }
+    }
+    toEvict->block->id = BLOCK_IS_FREE;
+
+
+    //Add the node to the free stack
+    if(!addNodeToHeadOfList(cache->ActivityTable->FreeStack, toEvict)){
+        return false;
+    }
+    cache->Occupancy--;
+
+
+    pthread_mutex_unlock(cache->lock);
     return true;
 }
 
@@ -286,21 +329,14 @@ bool populateBlock(block_t* targetBlock, byte* data, global_block_id_t id) {
 }
 
 
-bool pushBlockToServer(block_t* toPush) {
-    fprintf(stderr, "Pushing block to server");
-    fprintf(stderr, "ERROR: Not implemented yet");
-    exit(1);
-    return false;
-}
-
 
 //Blocks represent cache blocks, which are commonly 'cleared':
 //   -If the block is dirty, it's data is written back to the server
 //   -The memory containing the block's data is deallocated
 //   -The block's status information is reset
-bool clearBlock(cache_t* cache, block_t* toClear) {
+bool clearBlock(block_t* toClear) {
     if(!toClear) {
-        fprintf(stderr, "You can not clear a null block");
+        fprintf(stderr, "You can not clear a null block\n");
         return false;
     }
     pthread_mutex_lock(toClear->lock);
@@ -310,7 +346,7 @@ bool clearBlock(cache_t* cache, block_t* toClear) {
         }
         toClear->dirty = false;
     }
-    free(toClear->data);
+    //TODO clear/zero out memory maybe? more of a security thing, probably not necessary
     toClear->id = BLOCK_IS_FREE;
     pthread_mutex_unlock(toClear->lock);
     return true;
@@ -319,7 +355,7 @@ bool clearBlock(cache_t* cache, block_t* toClear) {
 
 
 bool FetchBlockFromServer(cache_t* targetCache, global_block_id_t idOfBlockToFetch) {
-    fprintf(stderr, "ERROR: Not implemented yet");
+    fprintf(stderr, "ERROR: Not implemented yet\n");
     exit(1);
     //Lookup in the recipe which server has the block
     return false;
@@ -333,7 +369,7 @@ bool MarkBlockDirty(cache_t* cache, global_block_id_t targetBlock) {
     }
     else {
         if(toMark->dirty)
-            fprintf(stderr, "block was already dirty");
+            fprintf(stderr, "block was already dirty\n");
         //CONCERN: what if multiple lock contentions are served in non-fifo order?
         pthread_mutex_lock(toMark->lock);
         toMark->dirty = true;
@@ -343,6 +379,7 @@ bool MarkBlockDirty(cache_t* cache, global_block_id_t targetBlock) {
         return true;
     }
 }
+
 
 bool BlockIsDirty(cache_t* cache, global_block_id_t targetBlock) {
     block_t* toCheck = GetBlock(cache, targetBlock);
@@ -358,6 +395,7 @@ bool BlockIsDirty(cache_t* cache, global_block_id_t targetBlock) {
         return true;
     }
 }
+
 
 uint32_t findWidthUnsigned(uint32_t input){
     uint32_t width = 1;
@@ -375,11 +413,13 @@ char * itoaWrapUn(uint32_t input){
     return buf;
 }
 
+
 void printUInt(uint32_t input){
     char * toPrint = itoaWrapUn(input);
     fprintf(stderr, toPrint);
     free(toPrint);
 }
+
 
 void CacheReport(cache_t * cache){
     fprintf(stderr, "Used blocks: \n");
@@ -396,6 +436,7 @@ void CacheReport(cache_t * cache){
             sentinel = sentinel->next;
         }
     }
+    fprintf(stderr, "\n");
     printUInt(used);
     fprintf(stderr, " total active blocks\n");
 
@@ -425,14 +466,104 @@ void CacheReport(cache_t * cache){
     }
 }
 
+void FlushDirtyBlocks(cache_t * cache){
+    while( CacheIsTooCrowded(cache) && EvictBlockToCache(cache) );
+}
+
+void SpawnHarvester(){
+
+}
+
+void SpawnFlusher(cache_t * cache){
+    pthread_t * hostThread = (pthread_t *)malloc(sizeof(pthread_t));
+    int flusher = pthread_create(hostThread, NULL, FlushDirtyBlocks, (void*)cache);
+    pthread_join(hostThread, malloc(4));
+}
+
+
+
 int main(int argc, char* argv[]) {
+
     //Smoke tests
-    uint32_t blockCount = 1024;
+
+    //Batched reservations / release / evict
+    uint32_t blockCount = 2048;
     uint32_t blockSize = 1024;
     float highWaterMark = 80.0F;
     float lowWaterMark = 20.0F;
     cache_t * cache = InitializeCache(blockSize, blockCount, highWaterMark, lowWaterMark);
     CacheReport(cache);
 
+
+
+
+    uint32_t i = 1;
+    for(;i<=blockCount;i++){
+        ReserveBlockInCache(cache, i);
+    }
+    CacheReport(cache);
+    i = 1;
+    for(;i<=blockCount;i++){
+        ReleaseBlockToCache(cache, i);
+    }
+    CacheReport(cache);
+    i = 1;
+    for(;i<=blockCount;i++){
+        ReserveBlockInCache(cache, i);
+    }
+    CacheReport(cache);
+    i = 1;
+    for(;i<=blockCount;i++){
+        EvictBlockToCache(cache);
+    }
+    CacheReport(cache);
+
+
+    //Interlaced reservations / release / evict
+
+    i = 1;
+    for(;i<=blockCount;i++){
+        ReserveBlockInCache(cache, i);
+        ReleaseBlockToCache(cache, i);
+        ReserveBlockInCache(cache, i);
+        EvictBlockToCache(cache);
+    }
+
+
+    i = 1;
+    for(;i<=blockCount/4;i++){
+        ReserveBlockInCache(cache, i);
+    }
+    CacheReport(cache);
+    i = 1;
+    for(;i<=blockCount/8;i++){
+        ReleaseBlockToCache(cache, i);
+    }
+    CacheReport(cache);
+    for(;i<=blockCount/4;i++){
+        EvictBlockToCache(cache);
+    }
+
+
+    i = 1;
+    for(;i<=blockCount/4;i++){
+        ReserveBlockInCache(cache, i);
+    }
+    CacheReport(cache);
+    i = 1;
+    for(;i<=blockCount/8;i++){
+        ReleaseBlockToCache(cache, 2*i);
+    }
+    CacheReport(cache);
+    for(;i<=blockCount/4;i++){
+        EvictBlockToCache(cache);
+    }
+    CacheReport(cache);
+
+
+
     return 0;
 }
+
+
+

@@ -4,7 +4,7 @@
 
 #define true 1
 #define false 0
-#define BLOCK_IS_FREE -1
+#define BLOCK_IS_FREE 0
 
 typedef int bool;
 typedef uint32_t global_block_id_t;

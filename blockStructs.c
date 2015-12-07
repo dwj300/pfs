@@ -2,7 +2,7 @@
 
 block_list_node_t * initializeBlockListNode(block_t * toEncapsulate){
     if(!toEncapsulate){
-        fprintf(stderr, "You must initialize a block before encapsulating it in a node.");
+        fprintf(stderr, "You must initialize a block before encapsulating it in a node.\n");
         return NULL;
     }
 
@@ -14,7 +14,7 @@ block_list_node_t * initializeBlockListNode(block_t * toEncapsulate){
         return newBlockListNode;
     }
     else{
-        fprintf(stderr, "Memory allocation for block node failed.");
+        fprintf(stderr, "Memory allocation for block node failed.\ns");
         return NULL;
     }
 }
@@ -27,7 +27,7 @@ block_list_t * initializeBlockList(){
         return newBlockList;
     }
     else{
-        fprintf(stderr, "Memory allocation for block list failed.");
+        fprintf(stderr, "Memory allocation for block list failed.\n");
         return NULL;
     }
 }
@@ -48,7 +48,7 @@ block_t* initializeBlock(byte * memorySegment) {
         return newBlock;
     }
     else{
-        fprintf(stderr, "Memory allocation for block failed.");
+        fprintf(stderr, "Memory allocation for block failed.\n");
         return NULL;
     }
 }
@@ -61,7 +61,7 @@ block_t* initializeBlock(byte * memorySegment) {
 //                     OR if the block is dirty
 bool destroyBlock(block_t* toDeallocate) {
     if(!toDeallocate){
-        fprintf(stderr, "A block must exist to destroy it.");
+        fprintf(stderr, "A block must exist to destroy it.\n");
         return false;
     }
 
@@ -84,7 +84,7 @@ bool destroyBlock(block_t* toDeallocate) {
 //  Note that this is only reliable if called by a thread with a lock on the block
 bool blockIsCleared(block_t* block) {
     if(!block) {
-        fprintf(stderr, "The block being checked does not exist.");
+        fprintf(stderr, "The block being checked does not exist.\n");
         return false;
     }
     return (block->dirty && (block->id == BLOCK_IS_FREE));
@@ -94,13 +94,13 @@ bool blockIsCleared(block_t* block) {
 
 block_mapping_node_t * initializeMappingNode(block_list_node_t * blockNodeBeingMapped){
     if(!blockNodeBeingMapped){
-        fprintf(stderr, "You cannot initialize a mapping node without giving the block node it will map to.");
+        fprintf(stderr, "You cannot initialize a mapping node without giving the block node it will map to.\n");
         return NULL;
     }
 
     block_mapping_node_t * newMappingNode = (block_mapping_node_t *)malloc(sizeof(block_mapping_node_t));
     if(!newMappingNode){
-        fprintf(stderr, "Allocation for the mapping node failed.");
+        fprintf(stderr, "Allocation for the mapping node failed.\n");
         return NULL;
     }
 
@@ -112,7 +112,7 @@ block_mapping_node_t * initializeMappingNode(block_list_node_t * blockNodeBeingM
 
 bool destroyMappingNode(block_mapping_node_t * toDestroy){
     if(!toDestroy){
-        fprintf(stderr, "You cannot destroy a null mapping node.");
+        fprintf(stderr, "You cannot destroy a null mapping node.\n");
         return false;
     }
     free(toDestroy);
@@ -122,17 +122,17 @@ bool destroyMappingNode(block_mapping_node_t * toDestroy){
 
 bool addNodeToHeadOfList(block_list_t * targetList, block_list_node_t * newHead){
     if(!newHead){
-        fprintf(stderr, "Block node doesn't exist, aborting block push");
+        fprintf(stderr, "Block node doesn't exist, aborting block push\n");
         return false;
     }
     if(!targetList){
-        fprintf(stderr, "List doesn't exist, aborting block push");
+        fprintf(stderr, "List doesn't exist, aborting block push\n");
         return false;
     }
     //Sanity checks
     if(newHead->previous || newHead->next){
         newHead->previous = newHead->next = NULL;
-        fprintf(stderr, "WARN: adding a previously-linked node to a list, it's previous host list might be broken");
+        fprintf(stderr, "WARN: adding a previously-linked node to a list, it's previous host list might be broken\n");
     }
 
     //If we're inserting into an empty list
@@ -159,11 +159,11 @@ bool addNodeToHeadOfList(block_list_t * targetList, block_list_node_t * newHead)
 
 block_list_node_t * removeNodeFromHeadOfList(block_list_t * sourceList){
     if(!sourceList){
-        fprintf(stderr, "Source list doesn't exist, aborting block removal");
+        fprintf(stderr, "Source list doesn't exist, aborting block removal\n");
         return NULL;
     }
     if(!(sourceList->head) || !(sourceList->tail)){
-        fprintf(stderr, "Source list is empty or corrupt, aborting block removal");
+        fprintf(stderr, "Source list is empty or corrupt, aborting block removal\n");
         return NULL;
     }
 
@@ -186,11 +186,11 @@ block_list_node_t * removeNodeFromHeadOfList(block_list_t * sourceList){
 
 block_list_node_t * removeNodeFromTailOfList(block_list_t * sourceList){
     if(!sourceList){
-        fprintf(stderr, "Source list doesn't exist, aborting block removal");
+        fprintf(stderr, "Source list doesn't exist, aborting block removal\n");
         return NULL;
     }
     if(!(sourceList->head) || !(sourceList->tail)){
-        fprintf(stderr, "Source list is empty or corrupt, aborting block removal");
+        fprintf(stderr, "Source list is empty or corrupt, aborting block removal\n");
         return NULL;
     }
 
@@ -213,11 +213,11 @@ block_list_node_t * removeNodeFromTailOfList(block_list_t * sourceList){
 
 block_list_node_t * removeNodeFromListByID(block_list_t * hostList, global_block_id_t IDOfBlockToRemove){
     if(!hostList){
-        fprintf(stderr, "Host list doesn't exist, aborting block removal");
+        fprintf(stderr, "Host list doesn't exist, aborting block removal\n");
         return NULL;
     }
     if(!(hostList->head) || !(hostList->tail)){
-        fprintf(stderr, "Source list is empty or corrupt, aborting block removal");
+        fprintf(stderr, "Source list is empty or corrupt, aborting block removal\n");
         return NULL;
     }
     if(hostList->head->block->id == IDOfBlockToRemove){
@@ -238,7 +238,7 @@ block_list_node_t * removeNodeFromListByID(block_list_t * hostList, global_block
             }
             sentinel = sentinel->next;
         }
-        fprintf(stderr, "WARN: Source list didn't contain the node requested, returning NULL.");
+        fprintf(stderr, "WARN: Source list didn't contain the node requested, returning NULL.\n");
         return NULL;
     }
 }
@@ -246,11 +246,11 @@ block_list_node_t * removeNodeFromListByID(block_list_t * hostList, global_block
 
 bool removeNodeFromList(block_list_t * hostList, block_list_node_t * toRemove){
     if(!hostList){
-        fprintf(stderr, "Host list doesn't exist, aborting block removal");
+        fprintf(stderr, "Host list doesn't exist, aborting block removal\n");
         return false;
     }
     if(!(hostList->head) || !(hostList->tail)){
-        fprintf(stderr, "Source list is empty or corrupt, aborting block removal");
+        fprintf(stderr, "Source list is empty or corrupt, aborting block removal\n");
         return false;
     }
 
