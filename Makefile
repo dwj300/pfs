@@ -23,7 +23,7 @@ client: client.c
 	$(CC) $(CFLAGS) $(CFLAGS2) client client.c
 
 cache: cache.c
-	$(CC) cache.c blockStructs.c itoa.c -pthread -Wall -g -o cache
+	$(CC) cache.c blockStructs.c -pthread -Wall -g -o cache
 
 test: test_program.c pfs.c
 	$(CC) $(CFLAGS) $(CFLAGS2) test test_program.c pfs.c

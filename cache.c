@@ -416,7 +416,8 @@ uint32_t findWidthUnsigned(uint32_t input){
 
 char * itoaWrapUn(uint32_t input){
     char * buf = (char *)malloc( sizeof(char) * (1+findWidthUnsigned(input)) );
-    ultoa(buf, input);
+    sprintf(buf, "%u", input);
+    // ultoa(buf, input);
     return buf;
 }
 
