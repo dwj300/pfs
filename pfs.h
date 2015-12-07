@@ -22,6 +22,7 @@ void initialize(int argc, char **argv);
 
 file_t files[MAX_FILES]; // todo: maybe put this on heap
 cache_t *cache;
-unsigned int current_fd;
+int current_fd;
 char *grapevine_host;
 int grapevine_port;
+server_t *servers;

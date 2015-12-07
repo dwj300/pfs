@@ -44,7 +44,9 @@ int insert(dictionary_t dict, char* key, void* data) {
         }
         hashval = hash(key);
         e->next = dict[hashval];
-        e->next->prev = e;
+        if (e->next != NULL) {
+            e->next->prev = e;    
+        }
         e->value = data;
         e->prev = NULL;
         dict[hashval] = e;
@@ -54,7 +56,6 @@ int insert(dictionary_t dict, char* key, void* data) {
         fprintf(stderr, "key found\n");
         return -1;
     }
-
     return 0;
 }
 
@@ -64,9 +65,12 @@ int delete(dictionary_t dict, char* key) {
     if (e == NULL) {
         fprintf(stderr, "key not found\n");
         return -1;
-    }    
-    // find previous node, if it exists
-    if(e->prev != NULL) {
+    }   
+    unsigned h = hash(key);
+    if (dict[h] == e) {
+        dict[h] = e->next;
+    }
+    else {// find previous node, if it exists // if(e->prev != NULL) {
         e->prev->next = e->next;
     }
 
@@ -74,10 +78,8 @@ int delete(dictionary_t dict, char* key) {
         e->next->prev = e->prev;
     }
     // User is responsible for freeing their own data!
-    free(e->value);
-    free(e->key);
     free(e);
-    return 0;
+    return 1;
 }
 
 void dictionary_print(dictionary_t dict) {

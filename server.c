@@ -93,7 +93,7 @@ int main(int argc, char *argv[]) {
 
     sockfd = socket(AF_INET, SOCK_STREAM, 0);
     if (sockfd < 0) {
-        fprintf(stderr, "ERROR opening socket");
+        fprintf(stderr, "ERROR opening socket\n");
         exit(1);
     }
     bzero((char *) &serv_addr, sizeof(serv_addr));
@@ -101,7 +101,7 @@ int main(int argc, char *argv[]) {
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(port);
     if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-        fprintf(stderr, "ERROR on binding");
+        fprintf(stderr, "ERROR on binding\n");
         exit(1);
     }
 
@@ -111,7 +111,7 @@ int main(int argc, char *argv[]) {
     while(1) {
         newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
         if (newsockfd < 0) {
-          fprintf(stderr, "ERROR on accept");
+          fprintf(stderr, "ERROR on accept\n");
           exit(1);
         }
 

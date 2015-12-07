@@ -9,5 +9,7 @@
 #include <netdb.h>
 #include "sharedresources.h"
 #include "dictionary.h"
+#include "config.h"
 
+server_t *servers;
 dictionary_t files;
