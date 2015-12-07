@@ -16,14 +16,17 @@ c3: pfs.c test1-c3.c
 server: server.c
 	$(CC) $(CFLAGS) $(CFLAGS2) server server.c
 
-grapevine: grapevine.c
-	$(CC) $(CFLAGS) $(CFLAGS2) grapevine grapevine.c
+grapevine: grapevine.c dictionary.c
+	$(CC) $(CFLAGS) $(CFLAGS2) grapevine grapevine.c dictionary.c
 
 client: client.c
 	$(CC) $(CFLAGS) $(CFLAGS2) client client.c
 
 cache: cache.c
 	$(CC) cache.c blockStructs.c itoa.c -pthread -Wall -g -o cache
+
+test: test_program.c pfs.c
+	$(CC) $(CFLAGS) $(CFLAGS2) test test_program.c pfs.c
 
 clean:
 	rm c1 c2 c3 client server cache grapevine

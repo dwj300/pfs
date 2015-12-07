@@ -38,7 +38,7 @@ int read_block(int socket_fd, char* block_id) {
     return 0;
 }
 
-int delete_block(char *block_id){
+int delete_block(char* block_id){
     int n = remove(block_id);
     if (n < 0) {
         fprintf(stderr, "Error deleting file\n");
@@ -47,8 +47,8 @@ int delete_block(char *block_id){
     return 0;
 }
 
-int parse_args(char *buffer, char **opcode, char **block_id, char **data) {
-    char *space = strchr(buffer, ' ');
+int parse_args(char* buffer, char** opcode, char** block_id, char** data) {
+    char* space = strchr(buffer, ' ');
     *opcode = malloc(sizeof(char) * 10);
     strncpy(*opcode, buffer, (space - buffer));
     *block_id = space + sizeof(char);
@@ -58,7 +58,7 @@ int parse_args(char *buffer, char **opcode, char **block_id, char **data) {
         return -1;
     }
     // fprintf(stderr, "block id:%sd\n", block_id);
-    char *last_space = strchr(*block_id, ' ');
+    char* last_space = strchr(*block_id, ' ');
     if (last_space == NULL) { // No data
         size_t ln = strlen(*block_id) - 1;
         if ((*block_id)[ln] == '\n') {
@@ -74,8 +74,7 @@ int parse_args(char *buffer, char **opcode, char **block_id, char **data) {
     return 0;
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     int sockfd, newsockfd, port, n;
     socklen_t clilen;
     if (argc < 2) {

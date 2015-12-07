@@ -41,6 +41,8 @@ grapevine
 dummyc
 client
 cache
+dict
+test
 # Mac OS X
 .DS_Store
 
