@@ -1,5 +1,6 @@
 #include "cache.h"
 #define CACHE_MAP_SECTOR_COUNT 8
+#include "itoa.h"
 
 bool CacheIsTooCrowded(cache_t * cache){
     return (cache->Occupancy > cache->HighWaterMark);
@@ -12,8 +13,9 @@ bool CacheIsTooVacant(cache_t * cache){
 
 
 bool pushBlockToServer(block_t* toPush) {
-    fprintf(stderr, "Pushing block to server\n");
-    fprintf(stderr, "ERROR: Not implemented yet\n");
+    //fprintf(stderr, "Pushing block to server\n");
+    //fprintf(stderr, "ERROR: Not implemented yet\n");
+    toPush->dirty = false;
     return true; //for debugging
 }
 
@@ -24,7 +26,6 @@ activity_table_t * initializeActivityTable(byte * rawMemoryToManage, uint32_t bl
         fprintf(stderr, "Memory allocation for activity table failed.\n");
         return NULL;
     }
-
     newTable->AccessQueue = initializeBlockList();
     newTable->FreeStack = initializeBlockList();
     if(!(newTable->AccessQueue) || !(newTable->FreeStack)){
@@ -72,7 +73,7 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
     newCache->LowWaterMark = (uint32_t)((lowWaterMarkPercent/100)*blockCount);
     newCache->BlockSize = blockSize;
 
-    newCache->DirtyList = initializeBlockList();
+    newCache->DirtyList = NULL;
     newCache->ActivityTable = initializeActivityTable(newCache->ManagedMemory, blockCount, blockSize);
     return newCache;
 }
@@ -249,12 +250,11 @@ bool ReleaseBlockToCache(cache_t* cache, global_block_id_t blockToRelease) {
 
     //Clear the block / write back if needed
     if( (hostingNode->block->dirty) ){
-        if( !pushBlockToServer(hostingNode->block) || !removeNodeFromList(cache->DirtyList, hostingNode)){
+        if( !pushBlockToServer(hostingNode->block) || !removeIDFromIDList(&(cache->DirtyList), blockToRelease)){
             return false;
         }
     }
     hostingNode->block->id = BLOCK_IS_FREE;
-    hostingNode->block->dirty = false;
 
 
     //Add the node to the free stack
@@ -285,12 +285,11 @@ bool EvictBlockToCache(cache_t* cache){
 
     //Clear the block / write back if needed
     if( (toEvict->block->dirty) ){
-        if( !pushBlockToServer(toEvict->block) || !removeNodeFromList(cache->DirtyList, toEvict)){
+        if( !pushBlockToServer(toEvict->block) || !removeIDFromIDList(&(cache->DirtyList), toEvict->block->id)){
             return false;
         }
     }
     toEvict->block->id = BLOCK_IS_FREE;
-    toEvict->block->dirty = false;
 
 
     //Add the node to the free stack
@@ -372,13 +371,16 @@ bool MarkBlockDirty(cache_t* cache, global_block_id_t targetBlock) {
         return false;
     }
     else {
+        if(toMark->block->dirty){
+            fprintf(stderr, "WARN: block was already dirty\n");
+            return true;
+        }
 
-        if(toMark->block->dirty)
-            fprintf(stderr, "block was already dirty\n");
         //CONCERN: what if multiple lock contentions are served in non-fifo order?
         toMark->block->dirty = true;
+
         //Add to dirty list
-        if( !addNodeToHeadOfList(cache->DirtyList, toMark) ){
+        if( !addIDToIDList(&(cache->DirtyList), targetBlock) ){
             pthread_mutex_unlock(cache->lock);
             return false;
         }
@@ -386,7 +388,6 @@ bool MarkBlockDirty(cache_t* cache, global_block_id_t targetBlock) {
         return true;
     }
 }
-
 
 bool BlockIsDirty(cache_t* cache, global_block_id_t targetBlock) {
     block_t* toCheck = GetBlock(cache, targetBlock);
@@ -475,19 +476,54 @@ void CacheReport(cache_t * cache){
 }
 
 void * FlushDirtyBlocks(void * cache){
-    while( CacheIsTooCrowded((cache_t*)cache) ){
-        EvictBlockToCache((cache_t*)cache);
+    fprintf(stderr, "Starting flushing. \n");
+    int flushed = 0;
+    cache_t * hostCache = (cache_t*)cache;
+    global_block_id_t currentTarget = popIDFromIDList( &(hostCache->DirtyList) );
+    while(currentTarget != 0){
+        block_list_node_t * hostingNode = findBlockNodeInAccessQueue(hostCache->ActivityTable, currentTarget);
+        if (hostingNode){
+            if(!pushBlockToServer(hostingNode->block)){
+                //if a push fails, might as well allow a retry later
+                addIDToIDList( &(hostCache->DirtyList) , currentTarget);
+            }
+            else{
+                flushed++;
+            }
+        }
+        else{
+            fprintf(stderr, "WARN: Block referenced by the dirty list was not found to be active in the cache. Cache is likely corrupt. \n");
+        }
+        currentTarget = popIDFromIDList( &(hostCache->DirtyList) );
     }
-
+    printUInt(flushed);
+    fprintf(stderr, " blocks flushed.\n");
     pthread_exit(0);
 }
 
-void SpawnHarvester(){
 
+void * Harvest(void * cache){
+    fprintf(stderr, "Done harvesting. \n");
+    int harvested = 0;
+
+    while( CacheIsTooCrowded((cache_t*)cache) ){
+        if( EvictBlockToCache((cache_t*)cache) ){
+            harvested ++;
+        }
+    }
+    printUInt(harvested);
+    fprintf(stderr, " blocks harvested. \n");
+    pthread_exit(0);
+}
+
+void SpawnHarvester(cache_t * cache){
+    pthread_t * hostThread = (pthread_t *)malloc(sizeof(pthread_t));
+    int harvester = pthread_create(hostThread, NULL, Harvest, (void*)cache);
+    pthread_join(*hostThread, malloc(4));
+    fprintf(stderr, "Done harvesting. \n");
 }
 
 void SpawnFlusher(cache_t * cache){
-    fprintf(stderr, "Starting flushing. \n");
     pthread_t * hostThread = (pthread_t *)malloc(sizeof(pthread_t));
     pthread_create(hostThread, NULL, FlushDirtyBlocks, (void*)cache); //int flusher = ?
     pthread_join(*hostThread, malloc(4));
@@ -501,41 +537,25 @@ void test_cache(int argc, char* argv[]) {
     //Smoke tests
 
     //Batched reservations / release / evict
-    uint32_t blockCount = 32;
+    uint32_t blockCount = 4096;
     uint32_t blockSize = 1024;
-    float highWaterMark = 2.0F;
-    float lowWaterMark = 1.0F;
+    float highWaterMark = 20.0F;
+    float lowWaterMark = 5.0F;
     cache_t * cache = InitializeCache(blockSize, blockCount, highWaterMark, lowWaterMark);
     CacheReport(cache);
 
-    ReserveBlockInCache(cache, 1);
-    MarkBlockDirty(cache, 1);
-    ReserveBlockInCache(cache, 257);
-    MarkBlockDirty(cache, 257);
-    ReserveBlockInCache(cache, 513);
-    MarkBlockDirty(cache, 513);
-    ReserveBlockInCache(cache, 769);
-    MarkBlockDirty(cache, 769);
-    CacheReport(cache);
-    EvictBlockToCache(cache);
-    EvictBlockToCache(cache);
-    EvictBlockToCache(cache);
-
-
-/*
     uint32_t i = 1;
-    for(;i<=blockCount/4;i++){
+    for(;i<=blockCount;i++){
         ReserveBlockInCache(cache, i);
         MarkBlockDirty(cache, i);
     }
     CacheReport(cache);
-    i = 1;
-    for(;i<=blockCount/8;i++){
-        EvictBlockToCache(cache);
-    }
+    SpawnHarvester(cache);
+    CacheReport(cache);
+    SpawnFlusher(cache);
     CacheReport(cache);
 
-
+/*
 
 
     uint32_t i = 1;

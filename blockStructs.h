@@ -54,3 +54,14 @@ block_list_node_t * removeNodeFromTailOfList(block_list_t * sourceList);
 block_list_node_t * removeNodeFromListByID(block_list_t * hostList, global_block_id_t IDOfBlockToRemove);
 bool removeNodeFromList(block_list_t * hostList, block_list_node_t * toRemove);
 
+
+typedef struct id_list_node{
+    uint32_t id;
+    struct id_list_node * next;
+} id_list_node_t;
+
+id_list_node_t * initializeIDListNode(global_block_id_t IDToEncapsulate);
+bool destroyIDListNode(id_list_node_t * toDestroy);
+bool removeIDFromIDList(id_list_node_t ** headOfTargetList, global_block_id_t toRemove);
+bool addIDToIDList(id_list_node_t ** headOfTargetList, global_block_id_t newID);
+global_block_id_t popIDFromIDList(id_list_node_t ** headOfTargetList);
