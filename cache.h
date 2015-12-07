@@ -36,3 +36,4 @@ block_t * GetBlock(cache_t* cache, global_block_id_t targetBlock);
 bool ReleaseBlock(global_block_id_t targetBlock);
 bool MarkBlockDirty(cache_t *cache, global_block_id_t targetBlock);
 bool BlockIsDirty(cache_t *cache, global_block_id_t targetBlock);
+void test_cache(int argc, char* argv[]);

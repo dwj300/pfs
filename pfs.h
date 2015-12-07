@@ -8,9 +8,8 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
-
+#include "cache.h"
 #include "config.h"
-#include "sharedresources.h"
 
 int pfs_create(const char *filename, int stripe_width);
 int pfs_open(const char *filename, const char mode);
@@ -21,22 +20,8 @@ int pfs_delete(const char *filename);
 int pfs_fstat(int filedes, struct pfs_stat *buf); // Check the config file for the definition of pfs_stat structure
 void initialize(int argc, char **argv);
 
-file_t files[MAX_FILES];
-
+file_t files[MAX_FILES]; // todo: maybe put this on heap
+cache_t *cache;
 unsigned int current_fd;
-
-// I think we can delete these structs
-typedef struct node {
-    void* data;
-    struct node* next;
-} node_t;
-
-typedef struct list {
-    int length;
-    node_t* head;
-} list_t;
-
-list_t* free_list;
-
 char *grapevine_host;
 int grapevine_port;

@@ -43,6 +43,8 @@ client
 cache
 dict
 test
+test_cache
+
 # Mac OS X
 .DS_Store
 

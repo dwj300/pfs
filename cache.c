@@ -424,7 +424,7 @@ char * itoaWrapUn(uint32_t input){
 
 void printUInt(uint32_t input){
     char * toPrint = itoaWrapUn(input);
-    fprintf(stderr, toPrint);
+    fprintf(stderr, "%s", toPrint);
     free(toPrint);
 }
 
@@ -489,14 +489,14 @@ void SpawnHarvester(){
 void SpawnFlusher(cache_t * cache){
     fprintf(stderr, "Starting flushing. \n");
     pthread_t * hostThread = (pthread_t *)malloc(sizeof(pthread_t));
-    int flusher = pthread_create(hostThread, NULL, FlushDirtyBlocks, (void*)cache);
+    pthread_create(hostThread, NULL, FlushDirtyBlocks, (void*)cache); //int flusher = ?
     pthread_join(*hostThread, malloc(4));
     fprintf(stderr, "Done flushing. \n");
 }
 
 
 
-int main(int argc, char* argv[]) {
+void test_cache(int argc, char* argv[]) {
 
     //Smoke tests
 
@@ -624,9 +624,6 @@ int main(int argc, char* argv[]) {
         EvictBlockToCache(cache);
     }
 */
-
-
-    return 0;
 }
 
 

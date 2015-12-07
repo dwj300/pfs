@@ -33,6 +33,7 @@ int delete_file(int socket_fd, char* filename) {
     else {
         file_t* file = (file_t*)node->value;
         // delete blocks off file servers
+        free(file);
         delete(files, filename);
         int success = 1;
         write(socket_fd, &success, sizeof(int));
