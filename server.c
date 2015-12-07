@@ -74,8 +74,7 @@ int parse_args(char *buffer, char **opcode, char **block_id, char **data) {
     return 0;
 }
 
-int main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
     int sockfd, newsockfd, port, n;
     socklen_t clilen;
     if (argc < 2) {
