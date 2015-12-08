@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
     char input_fname[20];
     char *buf;
     int cache_hit;
-    ssize_t nread;
+    //ssize_t nread;
 
     // Initialize the client
     initialize(argc, argv);
@@ -39,7 +39,8 @@ int main(int argc, char *argv[])
     strcpy(input_fname, argv[1]);
     ifdes = open(input_fname, O_RDONLY);
     buf = (char *)malloc(5*ONEKB);
-    nread = pread(ifdes, (void *)buf, 4*ONEKB,0);
+    //nread = pread(ifdes, (void *)buf, 4*ONEKB,0);
+    pread(ifdes, (void *)buf, 4*ONEKB,0);
 
     // create a file only once, say at client 1
     err_value = pfs_create("pfs_file1", 3);

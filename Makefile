@@ -1,5 +1,5 @@
 C=gcc
-CFLAGS= -Wall -g -std=c99
+CFLAGS= -Wall -g -std=gnu99
 CFLAGS2= -pthread -o
 
 all: c1 c2 c3 server client grapevine cache test

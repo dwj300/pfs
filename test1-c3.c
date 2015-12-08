@@ -25,7 +25,7 @@ int main(int argc, char *argv[])
     int err_value;
     char input_fname[20];
     char *buf;
-    ssize_t nread;
+    // ssize_t nread;
     struct pfs_stat mystat;
     int cache_hit;
 
@@ -41,7 +41,8 @@ int main(int argc, char *argv[])
     strcpy(input_fname, argv[1]);
     ifdes = open(input_fname, O_RDONLY);
     buf = (char *)malloc(4*ONEKB);
-    nread = pread(ifdes, (void *)buf, 3*ONEKB,8*ONEKB);
+    //nread = pread(ifdes, (void *)buf, 3*ONEKB,8*ONEKB);
+    pread(ifdes, (void *)buf, 3*ONEKB,8*ONEKB);
 
     // All the clients open the pfs file
     fdes = pfs_open("pfs_file1", 'w');
@@ -56,7 +57,7 @@ int main(int argc, char *argv[])
     printf("File Metadata:\n");
     printf("Time of creation: %s\n", ctime(&(mystat.pst_ctime)));
     printf("Time of last modification: %s\n", ctime(&(mystat.pst_mtime)));
-    printf("File Size: %lld\n", mystat.pst_size);
+    printf("File Size: %ld\n", mystat.pst_size);
 
     //Write the next 3 kbytes of data from the input file onto pfs_file
     err_value = pfs_write(fdes, (void *)buf, 3*ONEKB, 8*ONEKB, &cache_hit);

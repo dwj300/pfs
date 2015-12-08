@@ -23,7 +23,7 @@ int main(int argc, char *argv[])
     int err_value;
     char input_fname[20];
     char *buf;
-    ssize_t nread;
+    //ssize_t nread;
     int cache_hit;
 
     // Initialize the client
@@ -38,7 +38,8 @@ int main(int argc, char *argv[])
     strcpy(input_fname, argv[1]);
     ifdes = open(input_fname, O_RDONLY);
     buf = (char *)malloc(5*ONEKB);
-    nread = pread(ifdes, (void *)buf, 4*ONEKB,4*ONEKB);
+    // nread = pread(ifdes, (void *)buf, 4*ONEKB,4*ONEKB);
+    pread(ifdes, (void *)buf, 4*ONEKB,4*ONEKB);
 
     // All the clients open the pfs file
     fdes = pfs_open("pfs_file1", 'w');
