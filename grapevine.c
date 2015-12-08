@@ -24,20 +24,35 @@ int create_file(int socket_fd, char* filename, int stripe_width) {
 int delete_file(int socket_fd, char* filename) {
     // Check if filename exists
     entry_t* node = lookup(files, filename);
-    if (lookup(files, filename) == NULL) {
+    if (node == NULL) {
         fprintf(stderr, "File with name:%s doesn't exist.\n", filename);
         int success = 0;
         write(socket_fd, &success, sizeof(int));
         return 0;
     }
     else {
-        file_t* file = (file_t*)node->value;
+        //file_t* file = (file_t*)node->value;
         // delete blocks off file servers
-        free(file);
-        delete(files, filename);
-        int success = 1;
+        //free(file);
+        int success = delete(files, filename);
         write(socket_fd, &success, sizeof(int));
     }
+    return 1;
+}
+
+int open_file(int socket_fd, char* filename) {
+    entry_t* e = lookup(files, filename);
+    if (e == NULL) {
+        fprintf(stderr, "File: %s does not exist\n", filename);
+        recipe_t* recipe = malloc(sizeof(recipe_t));
+        recipe->num_blocks = -1;
+        write(socket_fd, recipe, sizeof(recipe_t));
+        close(socket_fd);
+        return -1;
+    }
+    file_t* file = (file_t*)e->value;
+    write(socket_fd, file->recipe, sizeof(recipe_t));
+    close(socket_fd);
     return 1;
 }
 
@@ -47,28 +62,44 @@ int fstat(char *filename) {
     return 0;
 }
 
+void get_servers(int socket_fd) {
+    write(socket_fd, servers, NUM_FILE_SERVERS * sizeof(server_t));
+    close(socket_fd);
+}
+
 int parse_args(char* buffer, char** opcode, void** data1, void** data2) {
     char* space = strchr(buffer, ' ');
     *opcode = malloc(sizeof(char) * 10);
     if (space == NULL) {
-        fprintf(stderr, "error: invalid command\n");
-        return -1;
+        (*opcode) = buffer;
     }
-    strncpy(*opcode, buffer, (space - buffer));
-    space += sizeof(char);
-    char* next_space = strchr(space, ' ');
-    if (next_space != NULL) {
-        (*data1) = malloc(255 * sizeof(char));
-        strncpy(*data1, space, (next_space-space));
-        (*data2) = (next_space + sizeof(char));
-    }
-    else {
-        (*data1) = space;
+    else{
+        strncpy(*opcode, buffer, (space - buffer));
+        space += sizeof(char);
+        char* next_space = strchr(space, ' ');
+        if (next_space != NULL) {
+            (*data1) = malloc(255 * sizeof(char));
+            strncpy(*data1, space, (next_space-space));
+            (*data2) = (next_space + sizeof(char));
+        }
+        else {
+            (*data1) = space;
+        }
     }
     return 0;
 }
 
+void initialize() {
+    files = create_dictionary();
+    servers = malloc(NUM_FILE_SERVERS*sizeof(server_t));
+    strcpy(servers[0].hostname, "localhost");
+    servers[0].port = 8081;
+    strcpy(servers[1].hostname, "localhost");
+    servers[1].port = 8082;
+}
+
 int main(int argc, char* argv[]) {
+    fprintf(stderr, "size: %lu\n", sizeof(server_t));
     int sockfd, newsockfd, port, n;
     socklen_t clilen;
     if (argc < 2) {
@@ -78,7 +109,7 @@ int main(int argc, char* argv[]) {
     else {
         port = atoi(argv[1]);
     }
-    files = create_dictionary();
+    initialize();
     fprintf(stderr, "Metadata manager starting on port: %d\n", port);
 
     char buffer[2048];
@@ -95,7 +126,7 @@ int main(int argc, char* argv[]) {
     serv_addr.sin_addr.s_addr = INADDR_ANY;
     serv_addr.sin_port = htons(port);
     if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
-        fprintf(stderr, "ERROR on binding");
+        fprintf(stderr, "ERROR on binding\n");
         exit(1);
     }
 
@@ -105,14 +136,14 @@ int main(int argc, char* argv[]) {
     while(1) {
         newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
         if (newsockfd < 0) {
-          fprintf(stderr, "ERROR on accept");
+          fprintf(stderr, "ERROR on accept\n");
           exit(1);
         }
 
         bzero(buffer,269);
         n = read(newsockfd,buffer,269);
         if (n < 0) {
-            fprintf(stderr, "ERROR reading from socket");
+            fprintf(stderr, "ERROR reading from socket\n");
             exit(1);
         }
         fprintf(stderr, "%s\n", buffer);
@@ -136,7 +167,15 @@ int main(int argc, char* argv[]) {
         else if (strcmp(opcode, "DELETE") == 0) {
             char* filename = (char*)data1;
             delete_file(newsockfd, filename);
-        }/*
+        }
+        else if (strcmp(opcode, "SERVERS") == 0) {
+            get_servers(newsockfd);
+        }
+        else if (strcmp(opcode, "OPEN") == 0) {
+            char* filename = (char*)data1;
+            open_file(newsockfd, filename);
+        }
+        /*
         else if (strcmp(opcode, "WRITE") == 0) {
             write_block(block_id, data);
         }
