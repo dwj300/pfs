@@ -1,5 +1,7 @@
 #pragma once
 
+#define h_addr h_addr_list[0] /* for backward compatibility */
+
 #include <stdio.h>
 #include <stdint.h>
 #include <netinet/in.h>

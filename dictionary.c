@@ -87,7 +87,7 @@ void dictionary_print(dictionary_t dict) {
     entry_t* p;
     for (e = 0; e < DICTSIZE; e++) {
         for (p = dict[e]; p != NULL; p = p->next) {
-            printf("%s -> %s\n", p->key, p->value);
+            fprintf(stderr, "%s -> %s\n", p->key, (char*)p->value);
         }
     }
 }
