@@ -14,6 +14,9 @@ int create_file(int socket_fd, char* filename, int stripe_width) {
     else {
         file_t* file = malloc(sizeof(file_t));
         file->filename = filename;
+        recipe_t *recipe = malloc(sizeof(recipe_t));
+        recipe->num_blocks = 0;
+        file->recipe = recipe;
         insert(files, filename, file);
         int success = 1;
         write(socket_fd, &success, sizeof(int));
@@ -67,6 +70,42 @@ void get_servers(int socket_fd) {
     close(socket_fd);
 }
 
+int create_block_gv(int socket_fd, char *filename) {
+    fprintf(stderr, "-1\n");
+    entry_t* e = lookup(files, filename);
+    fprintf(stderr, "0\n");
+
+    if (e == NULL) {
+        fprintf(stderr, "file: %s doesn't exist", filename);
+        recipe_t* recipe = malloc(sizeof(recipe_t));
+        recipe->num_blocks = -1;
+        write(socket_fd, recipe, sizeof(recipe_t));
+        close(socket_fd);
+        return -1;
+    }
+    fprintf(stderr, "1\n");
+    int gid = current_block_id;
+    fprintf(stderr, "2\n");
+    file_t *file = e->value;
+    fprintf(stderr, "3\n");
+    fprintf(stderr, "#:%d\n", file->recipe->num_blocks);
+
+    file->recipe->blocks[file->recipe->num_blocks].block_id = gid;
+    fprintf(stderr, "1\n");
+    fprintf(stderr, "foo2\n");
+
+    file->recipe->blocks[file->recipe->num_blocks].server_id = 0; // TODO: Round robin?
+    file->recipe->num_blocks += 1;
+    fprintf(stderr, "block_id:%d\n", file->recipe->blocks[0].block_id);
+    // Create block on server.
+    create_block(servers[0].hostname, servers[0].port, gid);
+    // send back new recipe?
+    write(socket_fd, file->recipe, sizeof(recipe_t));
+    close(socket_fd);
+    current_block_id += 1;
+    return gid;
+}
+
 int parse_args(char* buffer, char** opcode, void** data1, void** data2) {
     char* space = strchr(buffer, ' ');
     *opcode = malloc(sizeof(char) * 10);
@@ -96,6 +135,7 @@ void initialize() {
     servers[0].port = 8081;
     strcpy(servers[1].hostname, "localhost");
     servers[1].port = 8082;
+    current_block_id = 1;
 }
 
 int main(int argc, char* argv[]) {
@@ -174,6 +214,10 @@ int main(int argc, char* argv[]) {
         else if (strcmp(opcode, "OPEN") == 0) {
             char* filename = (char*)data1;
             open_file(newsockfd, filename);
+        }
+        else if (strcmp(opcode, "C_BLOCK") == 0) {
+            char* filename = (char*)data1;
+            create_block_gv(newsockfd, filename);
         }
         /*
         else if (strcmp(opcode, "WRITE") == 0) {

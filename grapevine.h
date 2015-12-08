@@ -10,6 +10,8 @@
 #include "sharedresources.h"
 #include "dictionary.h"
 #include "config.h"
+#include "client.h"
 
 server_t *servers;
 dictionary_t files;
+int current_block_id;

@@ -7,6 +7,7 @@ int create_block(char* block_id) {
         return -1;
     }
     fclose(file);
+    fprintf(stderr, "Creating file!\n");
     return 0;
 }
 

@@ -16,8 +16,8 @@ c3: pfs.c test1-c3.c cache.c blockStructs.c client.c sharedresources.c
 server: server.c
 	$(CC) $(CFLAGS) $(CFLAGS2) server server.c
 
-grapevine: grapevine.c dictionary.c sharedresources.c
-	$(CC) $(CFLAGS) $(CFLAGS2) grapevine grapevine.c dictionary.c sharedresources.c
+grapevine: grapevine.c dictionary.c sharedresources.c client.c
+	$(CC) $(CFLAGS) $(CFLAGS2) grapevine grapevine.c dictionary.c sharedresources.c client.c
 
 client: test_client.c client.c sharedresources.c
 	$(CC) $(CFLAGS) $(CFLAGS2) client test_client.c sharedresources.c

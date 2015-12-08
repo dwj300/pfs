@@ -27,7 +27,7 @@ typedef struct recipe {
 } recipe_t;
 
 typedef struct file {
-    char* filename;
+    const char* filename;
     struct pfs_stat* stat;
     recipe_t* recipe;
 } file_t;

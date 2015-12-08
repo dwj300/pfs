@@ -1,8 +1,6 @@
 #include "pfs.h"
 
-
 // assume 255 max filename
-// CREATE [filename] [strip] =
 int pfs_create(const char *filename, int stripe_width) {
     int socket_fd = connect_socket(grapevine_host, grapevine_port);
     if (socket_fd < 0) {
@@ -23,6 +21,11 @@ int pfs_create(const char *filename, int stripe_width) {
 
 int pfs_open(const char *filename, const char mode) {
     // Connect to grapevine:
+    int fd = current_fd;
+    current_fd += 1;
+    files[fd].filename = filename;
+    fprintf(stderr, "h1\n");
+
     int socket_fd = connect_socket(grapevine_host, grapevine_port);
     if (socket_fd < 0) {
         fprintf(stderr, "Failed to open socket\n");
@@ -35,16 +38,12 @@ int pfs_open(const char *filename, const char mode) {
     write(socket_fd, command, length+1); // +1 for null terminator. Not sure if needed
     recipe_t *recipe = malloc(sizeof(recipe_t));
     read(socket_fd, recipe, sizeof(recipe_t));
-    if(recipe->num_blocks == -1) {
+    files[fd].recipe = recipe;
+    if(files[fd].recipe->num_blocks == -1) {
         fprintf(stderr, "Could not open %s. file does not exist\n", filename);
         return -1;
     }
-    //files[current_fd] = malloc(sizeof(file_t)); // todo: maybe use malloc?
-    int fd = current_fd;
-    current_fd += 1;
-
-    files[fd].recipe = recipe;
-    current_fd += 1;
+    
     close(socket_fd);
     return fd;
 }
@@ -52,6 +51,7 @@ int pfs_open(const char *filename, const char mode) {
 ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache_hit) {
     file_t file = files[filedes];
     // This is the easy, single block case.
+    // assume read token...
     if ((offset + nbyte) <= (PFS_BLOCK_SIZE * 1024)) {
         int block_id = 0;
         int global_block_id = file.recipe->blocks[0].block_id;
@@ -67,61 +67,31 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
     return 0;
 
 }
-    /*
-    int block_id = (offset / (PFS_BLOCK_SIZE * 1024));
-    // TODO: multiple blocks...
-    // if block doesn't exist
-    if ((block_id + 1) >= file->recipe->num_blocks) {
-        // huh?> for write... create (at least 1) block.
-        return -1;
-    }
-    off_t cur_offset = offset % (PFS_BLOCK_SIZE * 1024);
-    ssize_t amt_read = 0;
-    char *temp = malloc(PFS_BLOCK_SIZE * 1024);
-    while(amt_read < nbyte) {
-        int global_block_id = file->recipe->blocks[block_id].block_id;
-        // block not in cache
-        if (get_block_from_cache(temp, global_block_id) == 0) {
-            server_t *server = servers[file->recipe->blocks[block_id].server_id];
-            if (read_block(server.hostname, server.port, global_block_id, char temp) != 1) {
-                fprintf(stderr, "failed to read block from server\n");
-                exit(1);
-            }
-            if (n)
-            memcpy(buf, temp+cur_offset, )
-
-        }
-        // block in cache
-        else {
-
-        }
-        block_id += 1;
-        amt_read += (PFS_BLOCK_SIZE * 1024);
-        buf += (PFS_BLOCK_SIZE * 1024);
-    }
-
-    WriteToBlockAndMarkDirty()
-    bool WriteToBlockAndMarkDirty(cache_t * cache, global_block_id_t targetBlock, &temp, uint32_t startOffset, uint32_t endPosition ) {
-
-
-    // if read token:
-    //int global_block_id =
-
-    //byte* data =
-
-    // iterate over blocks
-    //    check for read token
-    //    spawn a thread:
-    //        get from cache
-    //        if cant
-    //            got to network
-    //            unlock block
-    //    thread join
-    return -1;
-}*/
 
 ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int *cache_hit) {
+    file_t file = files[filedes];
 
+    int block_id = offset / (1024*PFS_BLOCK_SIZE);
+    int offset_within_block = offset - (block_id*1024*PFS_BLOCK_SIZE);
+    if (block_id+1 >= file.recipe->num_blocks) {
+        // Need to create a block. (matbe more. TODO: fix dis)
+        char* command = malloc(269*sizeof(char));
+        sprintf(command, "C_BLOCK %s", file.filename);
+        int socket_fd = connect_socket(grapevine_host, grapevine_port);
+        write(socket_fd, command, strlen(command)+1);
+        recipe_t* recipe = malloc(sizeof(recipe_t));
+        read(socket_fd, recipe, sizeof(recipe_t));
+        file.recipe = recipe;
+        if (file.recipe->num_blocks == -1) {
+            fprintf(stderr, "Failed to create a new block.");
+            exit(1);
+        }
+    }
+    // TODO: change cache write to be a constant void * to match API.
+    int gid = file.recipe->blocks[block_id].block_id; // TODO: change api to be offset and size
+    WriteToBlockAndMarkDirty(cache, gid, buf, offset_within_block, offset_within_block+nbyte); // TODO: also pass server????
+
+    fprintf(stderr, "new recipe blocks!: %d", file.recipe->num_blocks);
     return -1;
 }
 
