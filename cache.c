@@ -388,7 +388,7 @@ bool WriteToBlockAndMarkDirty(cache_t * cache, global_block_id_t targetBlock, by
             return false;
         }
         else{
-            return WriteToBlockAndMarkDirty(cache, targetBlock, toCopy, startOffset, endPosition)
+            return WriteToBlockAndMarkDirty(cache, targetBlock, toCopy, startOffset, endPosition);
         }
     }
     else {
@@ -583,7 +583,8 @@ void test_cache(int argc, char* argv[]) {
     uint32_t i = 1;
     for(;i<=blockCount;i++){
         ReserveBlockInCache(cache, i);
-        WriteToBlockAndMarkDirty(cache, i);
+        byte* data = malloc(blockSize);
+        WriteToBlockAndMarkDirty(cache, i, data, 0, 1024);
     }
     CacheReport(cache);
     SpawnHarvester(cache);

@@ -1,5 +1,10 @@
+#pragma once
+
 #include <stdio.h>
 #include <stdint.h>
+#include <netinet/in.h>
+#include <netdb.h>
+#include <strings.h>
 
 #define true 1
 #define false 0
@@ -7,6 +12,7 @@
 #define MAX_BLOCKS 100
 
 typedef int bool;
+typedef char byte;
 typedef int32_t global_block_id_t;
 typedef int32_t global_server_id_t;
 
@@ -31,3 +37,4 @@ typedef struct server {
     int port;
 } server_t;
 
+int connect_socket(char *host, int port);

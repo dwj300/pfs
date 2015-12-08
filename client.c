@@ -1,6 +1,6 @@
 #include "client.h"
 
-int read_block_from_fs(int socket_fd, int block_id, char **buffer)  {
+int read_block_from_fs(int socket_fd, int block_id, byte** buffer)  {
     char command[17];
     sprintf(command, "READ %d", block_id);
     int n = write(socket_fd, command, strlen(command));
@@ -17,7 +17,7 @@ int read_block_from_fs(int socket_fd, int block_id, char **buffer)  {
     return 0;
 }
 
-int write_block_on_fs(int socket_fd, int block_id, char *data) {
+int write_block_on_fs(int socket_fd, int block_id, byte* data) {
     char command[1042];
     sprintf(command, "WRITE %d", block_id);
     int l = strlen(command);
@@ -53,36 +53,6 @@ int delete_block_on_fs(int socket_fd, int block_id) {
     return 0;
 }
 
-int connect_socket(char *host, int port) {
-    int sockfd;
-
-    struct sockaddr_in serv_addr;
-    struct hostent *server;
-
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) {
-        fprintf(stderr, "ERROR opening socket\n");
-        return -1;
-    }
-    server = gethostbyname(host);
-    if (server == NULL) {
-        fprintf(stderr,"ERROR, no such host\n");
-        return -1;
-    }
-    bzero((char *) &serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr,
-         (char *)&serv_addr.sin_addr.s_addr,
-         server->h_length);
-    serv_addr.sin_port = htons(port);
-    if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0) {
-        fprintf(stderr, "ERROR connecting\n");
-        return -1;
-    }
-
-    return sockfd;
-}
-
 int create_block(char *host, int port, int block_id) {
     int sock_id = connect_socket(host, port);
     create_block_on_fs(sock_id, block_id);
@@ -90,14 +60,14 @@ int create_block(char *host, int port, int block_id) {
     return 1;
 }
 
-int read_block(char *host, int port, int block_id, char **data) {
+int read_block(char *host, int port, int block_id, byte** data) {
     int sock_id = connect_socket(host, port);
     read_block_from_fs(sock_id, block_id, data);
     close(sock_id);
     return 1;
 }
 
-int write_block(char *host, int port, int block_id, char *data) {
+int write_block(char *host, int port, int block_id, byte* data) {
     int sock_id = connect_socket(host, port);
     write_block_on_fs(sock_id, block_id, data);
     close(sock_id);

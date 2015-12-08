@@ -1,34 +1,6 @@
 #include "pfs.h"
 
-int connect_socket(char *host, int port) {
-    int sockfd;
 
-    struct sockaddr_in serv_addr;
-    struct hostent *server;
-
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) {
-        fprintf(stderr, "ERROR opening socket\n");
-        return -1;
-    }
-    server = gethostbyname(host);
-    if (server == NULL) {
-        fprintf(stderr,"ERROR, no such host\n");
-        return -1;
-    }
-    bzero((char *) &serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr,
-         (char *)&serv_addr.sin_addr.s_addr,
-         server->h_length);
-    serv_addr.sin_port = htons(port);
-    if (connect(sockfd,(struct sockaddr *)&serv_addr,sizeof(serv_addr)) < 0) {
-        fprintf(stderr, "ERROR connecting\n");
-        return -1;
-    }
-
-    return sockfd;
-}
 // assume 255 max filename
 // CREATE [filename] [strip] =
 int pfs_create(const char *filename, int stripe_width) {
@@ -77,19 +49,30 @@ int pfs_open(const char *filename, const char mode) {
     return fd;
 }
 
-int get_block_from_cache(void **data, int block_id) { 
-    fprintf(stderr, "NOT IMPLEMENTED\n");
-    return 1;
-}
-
 ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache_hit) {
+    file_t file = files[filedes];
+    // This is the easy, single block case.
+    if ((offset + nbyte) <= (PFS_BLOCK_SIZE * 1024)) {
+        int block_id = 0;
+        int global_block_id = file.recipe->blocks[0].block_id;
+        byte* addr = ReadOrReserveBlockAndLock(cache, global_block_id, cache_hit);
+        if((*cache_hit) == false) {
+            server_t server = servers[file.recipe->blocks[block_id].server_id];
+            read_block(server.hostname, server.port, global_block_id, &addr);
+            UnlockBlock(cache, global_block_id);
+        }
+        memcpy(buf, addr+offset, nbyte);
+        return nbyte;
+    }
+    return 0;
+
+}
+    /*
     int block_id = (offset / (PFS_BLOCK_SIZE * 1024));
-    file_t *file = files[filedes];
-    
+    // TODO: multiple blocks...
     // if block doesn't exist
     if ((block_id + 1) >= file->recipe->num_blocks) {
         // huh?> for write... create (at least 1) block.
-        //FAIL: todo:
         return -1;
     }
     off_t cur_offset = offset % (PFS_BLOCK_SIZE * 1024);
@@ -116,10 +99,15 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
         amt_read += (PFS_BLOCK_SIZE * 1024);
         buf += (PFS_BLOCK_SIZE * 1024);
     }
-    // if read token:
-    //int global_block_id = 
 
-    //byte* data = 
+    WriteToBlockAndMarkDirty()
+    bool WriteToBlockAndMarkDirty(cache_t * cache, global_block_id_t targetBlock, &temp, uint32_t startOffset, uint32_t endPosition ) {
+
+
+    // if read token:
+    //int global_block_id =
+
+    //byte* data =
 
     // iterate over blocks
     //    check for read token
@@ -130,7 +118,7 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
     //            unlock block
     //    thread join
     return -1;
-}
+}*/
 
 ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int *cache_hit) {
 

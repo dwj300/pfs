@@ -2,14 +2,13 @@
 #include <unistd.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <strings.h>
 #include <unistd.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include <netinet/in.h>
-#include <netdb.h>
 #include "cache.h"
+#include "client.h"
 #include "config.h"
+#include "sharedresources.h"
 
 int pfs_create(const char *filename, int stripe_width);
 int pfs_open(const char *filename, const char mode);

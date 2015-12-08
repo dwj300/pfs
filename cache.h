@@ -3,7 +3,6 @@
 
 typedef int32_t file_desc_t;
 typedef int32_t offset_t;
-typedef char byte;
 
 typedef struct activity_table {
     block_list_t * AccessQueue;
@@ -34,9 +33,12 @@ typedef struct cache {
 
 //Cache access methods
 
-cache_t * InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWaterMarkPercent, float lowWaterMarkPercent);
-block_t * GetBlock(cache_t* cache, global_block_id_t targetBlock);
+cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWaterMarkPercent, float lowWaterMarkPercent);
+block_t* GetBlock(cache_t* cache, global_block_id_t targetBlock);
 bool ReleaseBlock(global_block_id_t targetBlock);
 bool MarkBlockDirty(cache_t *cache, global_block_id_t targetBlock);
 bool BlockIsDirty(cache_t *cache, global_block_id_t targetBlock);
 void test_cache(int argc, char* argv[]);
+byte* ReadOrReserveBlockAndLock(cache_t* cache, global_block_id_t targetBlock, bool* present);
+bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, byte* toCopy, uint32_t startOffset, uint32_t endPosition);
+bool UnlockBlock(cache_t* cache, global_block_id_t targetBlock);
