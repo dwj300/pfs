@@ -11,6 +11,7 @@ typedef char byte;
 // General struct definitions
 typedef struct block{
     global_block_id_t id;
+    global_server_id_t host;
     pthread_mutex_t *lock;
     bool dirty;
     byte *data;

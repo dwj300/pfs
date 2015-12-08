@@ -6,7 +6,8 @@
 #define BLOCK_IS_FREE 0
 
 typedef int bool;
-typedef uint32_t global_block_id_t;
+typedef int32_t global_block_id_t;
+typedef int32_t global_server_id_t;
 
 typedef struct file {
     char* filename;
