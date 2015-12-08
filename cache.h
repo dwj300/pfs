@@ -40,5 +40,5 @@ bool MarkBlockDirty(cache_t *cache, global_block_id_t targetBlock);
 bool BlockIsDirty(cache_t *cache, global_block_id_t targetBlock);
 void test_cache(int argc, char* argv[]);
 byte* ReadOrReserveBlockAndLock(cache_t* cache, global_block_id_t targetBlock, bool* present);
-bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, byte* toCopy, uint32_t startOffset, uint32_t endPosition);
+bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, const byte* toCopy, uint32_t startOffset, uint32_t endPosition, int server_id);
 bool UnlockBlock(cache_t* cache, global_block_id_t targetBlock);

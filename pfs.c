@@ -68,30 +68,40 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
 
 }
 
+void client_create_block(file_t *file) {
+    char* command = malloc(269*sizeof(char));
+    sprintf(command, "C_BLOCK %s", file->filename);
+    int socket_fd = connect_socket(grapevine_host, grapevine_port);
+    write(socket_fd, command, strlen(command)+1);
+    recipe_t* recipe = malloc(sizeof(recipe_t));
+    read(socket_fd, recipe, sizeof(recipe_t));
+    close(socket_fd);
+    file->recipe = recipe;
+    if (file->recipe->num_blocks == -1) {
+        fprintf(stderr, "Failed to create a new block.");
+        exit(1);
+    }
+    fprintf(stderr, "try1: %d\n", file->recipe->blocks[0].block_id);
+}
+
 ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int *cache_hit) {
-    file_t file = files[filedes];
+    file_t *file = &(files[filedes]);
 
     int block_id = offset / (1024*PFS_BLOCK_SIZE);
     int offset_within_block = offset - (block_id*1024*PFS_BLOCK_SIZE);
-    if (block_id+1 >= file.recipe->num_blocks) {
+    if (block_id+1 >= file->recipe->num_blocks) {
         // Need to create a block. (matbe more. TODO: fix dis)
-        char* command = malloc(269*sizeof(char));
-        sprintf(command, "C_BLOCK %s", file.filename);
-        int socket_fd = connect_socket(grapevine_host, grapevine_port);
-        write(socket_fd, command, strlen(command)+1);
-        recipe_t* recipe = malloc(sizeof(recipe_t));
-        read(socket_fd, recipe, sizeof(recipe_t));
-        file.recipe = recipe;
-        if (file.recipe->num_blocks == -1) {
-            fprintf(stderr, "Failed to create a new block.");
-            exit(1);
-        }
+        client_create_block(file);
+        fprintf(stderr, "try1: %d\n", file->recipe->blocks[0].block_id);
+
+        fprintf(stderr, "BLOCK_ID: %d\n", files[filedes].recipe->blocks[block_id].block_id);
+
     }
     // TODO: change cache write to be a constant void * to match API.
-    int gid = file.recipe->blocks[block_id].block_id; // TODO: change api to be offset and size
-    WriteToBlockAndMarkDirty(cache, gid, buf, offset_within_block, offset_within_block+nbyte); // TODO: also pass server????
+    int gid = file->recipe->blocks[block_id].block_id; // TODO: change api to be offset and size
+    WriteToBlockAndMarkDirty(cache, gid, buf, offset_within_block, offset_within_block+nbyte, file->recipe->blocks[block_id].server_id); // TODO: also pass server????
 
-    fprintf(stderr, "new recipe blocks!: %d", file.recipe->num_blocks);
+    fprintf(stderr, "new recipe blocks!: %d", file->recipe->num_blocks);
     return -1;
 }
 

@@ -113,7 +113,8 @@ int parse_args(char* buffer, char** opcode, void** data1, void** data2) {
         (*opcode) = buffer;
     }
     else{
-        strncpy(*opcode, buffer, (space - buffer));
+        char *end = stpncpy(*opcode, buffer, (space - buffer));
+        (*end) = '\0';
         space += sizeof(char);
         char* next_space = strchr(space, ' ');
         if (next_space != NULL) {
@@ -125,6 +126,7 @@ int parse_args(char* buffer, char** opcode, void** data1, void** data2) {
             (*data1) = space;
         }
     }
+    fprintf(stderr, "fooopcode:%sd\n", (*opcode));
     return 0;
 }
 
@@ -139,7 +141,7 @@ void initialize() {
 }
 
 int main(int argc, char* argv[]) {
-    fprintf(stderr, "size: %lu\n", sizeof(server_t));
+    fprintf(stderr, "size: %lu\n", sizeof(recipe_t));
     int sockfd, newsockfd, port, n;
     socklen_t clilen;
     if (argc < 2) {

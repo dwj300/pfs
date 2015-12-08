@@ -380,7 +380,7 @@ bool FetchBlockFromServer(cache_t* targetCache, global_block_id_t idOfBlockToFet
 
 
 //Reserves a space block if the block isn't in the cache already -> what if the block doesn't exist, is written to
-bool WriteToBlockAndMarkDirty(cache_t * cache, global_block_id_t targetBlock, byte * toCopy, uint32_t startOffset, uint32_t endPosition ) {
+bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, const byte * toCopy, uint32_t startOffset, uint32_t endPosition, int server_id) {
     block_list_node_t * hostingNode = findBlockNodeInAccessQueue(cache->ActivityTable, targetBlock);
     if(!hostingNode) {
         //Must get the block from the server previous to writing to it
@@ -388,7 +388,7 @@ bool WriteToBlockAndMarkDirty(cache_t * cache, global_block_id_t targetBlock, by
             return false;
         }
         else{
-            return WriteToBlockAndMarkDirty(cache, targetBlock, toCopy, startOffset, endPosition);
+            return WriteToBlockAndMarkDirty(cache, targetBlock, toCopy, startOffset, endPosition, server_id);
         }
     }
     else {
@@ -405,6 +405,7 @@ bool WriteToBlockAndMarkDirty(cache_t * cache, global_block_id_t targetBlock, by
             return true;
         }
         toWriteInto->dirty = true;
+        toWriteInto->host = server_id;
         pthread_mutex_unlock(toWriteInto->lock);
 
         pthread_mutex_lock(cache->DirtyListLock);
@@ -584,7 +585,7 @@ void test_cache(int argc, char* argv[]) {
     for(;i<=blockCount;i++){
         ReserveBlockInCache(cache, i);
         byte* data = malloc(blockSize);
-        WriteToBlockAndMarkDirty(cache, i, data, 0, 1024);
+        WriteToBlockAndMarkDirty(cache, i, data, 0, 1024, 0);
     }
     CacheReport(cache);
     SpawnHarvester(cache);
