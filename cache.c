@@ -352,39 +352,54 @@ bool ReleaseBlockToCache(cache_t* cache, global_block_id_t blockToRelease) {
     return true;
 }
 
-
-byte * ReadOrReserveBlockAndLock(cache_t* cache, global_block_id_t targetBlock, bool * present){
+//byte * ReadOrReserveBlockAndLock(cache_t* cache, global_block_id_t targetBlock, bool * present){
+bool ReadBlockFromCache(cache_t* cache, global_block_id_t targetBlock, bool* present, off_t offset, ssize_t nbyte, int server_id, byte** buffer) {
     block_t * blockInCache = GetBlockFromCache(cache, targetBlock);
     if(!blockInCache){
         *present = false;
         blockInCache = ReserveBlockInCache(cache, targetBlock);
+
+        server_t* server = get_server(server_id);
+        pthread_mutex_lock(blockInCache->lock);
+        read_block(server->hostname, server->port, targetBlock, &(blockInCache->data));
     }
     else{
         *present = true;
-    }
-
-    if(blockInCache){
         pthread_mutex_lock(blockInCache->lock);
     }
-    return blockInCache->data;
+
+    memcpy(buffer, blockInCache->data+offset, nbyte);
+    pthread_mutex_unlock(blockInCache->lock);
+
+    //return blockInCache->data;
+    return true;
 }
 
+bool FetchBlockFromServer(cache_t* cache, global_block_id_t idOfBlockToFetch, int server_id) {
+    block_t* block = ReserveBlockInCache(cache, idOfBlockToFetch);
+    // todo: make atomic
+    block->host = server_id;
+    block->dirty = false;
 
+    server_t* server = get_server(server_id);
+    int success = read_block(server->hostname, server->port, idOfBlockToFetch, &(block->data));
+    if (!success) {
+        return false;
+    }
 
-bool FetchBlockFromServer(cache_t* targetCache, global_block_id_t idOfBlockToFetch) {
-    fprintf(stderr, "ERROR: Not implemented yet\n");
-    exit(1);
+    fprintf(stderr, "going to server to get block id: %d\n", idOfBlockToFetch);
+    // exit(1);
     //Lookup in the recipe which server has the block
-    return false;
+    return true;
 }
 
 
 //Reserves a space block if the block isn't in the cache already -> what if the block doesn't exist, is written to
 bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, const byte * toCopy, uint32_t startOffset, uint32_t endPosition, int server_id) {
-    block_list_node_t * hostingNode = findBlockNodeInAccessQueue(cache->ActivityTable, targetBlock);
-    if(!hostingNode) {
+    block_t* toWriteInto = GetBlockFromCache(cache, targetBlock);
+    if(!toWriteInto) {
         //Must get the block from the server previous to writing to it
-        if(!FetchBlockFromServer(cache, targetBlock)){
+        if(!FetchBlockFromServer(cache, targetBlock, server_id)){
             return false;
         }
         else{
@@ -396,7 +411,6 @@ bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, con
             fprintf(stderr, "Write Offsets are illogical.\n");
             return false;
         }
-        block_t * toWriteInto = hostingNode->block;
         pthread_mutex_lock(toWriteInto->lock);
         memcpy( ((void*)toWriteInto->data)+startOffset, (void *)toCopy, (endPosition - startOffset) );
         if(toWriteInto->dirty){
@@ -405,7 +419,7 @@ bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, con
             return true;
         }
         toWriteInto->dirty = true;
-        toWriteInto->host = server_id;
+        //toWriteInto->host = server_id;
         pthread_mutex_unlock(toWriteInto->lock);
 
         pthread_mutex_lock(cache->DirtyListLock);

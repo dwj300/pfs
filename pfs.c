@@ -54,14 +54,18 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
     // assume read token...
     if ((offset + nbyte) <= (PFS_BLOCK_SIZE * 1024)) {
         int block_id = 0;
-        int global_block_id = file.recipe->blocks[0].block_id;
-        byte* addr = ReadOrReserveBlockAndLock(cache, global_block_id, cache_hit);
-        if((*cache_hit) == false) {
-            server_t server = servers[file.recipe->blocks[block_id].server_id];
-            read_block(server.hostname, server.port, global_block_id, &addr);
-            UnlockBlock(cache, global_block_id);
+        int global_block_id = file.recipe->blocks[block_id].block_id;
+        bool success = ReadBlockFromCache(cache, global_block_id, cache_hit, offset, nbyte, file.recipe->blocks[block_id].server_id, buf);
+        if (!success) {
+            fprintf(stderr, "Failed to read data\n");
+            return -1;
         }
-        memcpy(buf, addr+offset, nbyte);
+        if((*cache_hit) == false) {
+            //server_t server = servers[file.recipe->blocks[block_id].server_id];
+            //read_block(server.hostname, server.port, global_block_id, &addr);
+            //UnlockBlock(cache, global_block_id);
+        }
+        //memcpy(buf, addr+offset, nbyte);
         return nbyte;
     }
     return 0;
@@ -148,6 +152,7 @@ void print_servers() {
         fprintf(stderr, "server %d: hostname->%s, port->%d\n", i, servers[i].hostname, servers[i].port);
     }
 }
+
 
 //void print_rec
 

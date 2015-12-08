@@ -1,4 +1,6 @@
 #include "blockStructs.h"
+#include "client.h"
+
 #define CACHE_MAP_SECTOR_COUNT 8
 
 typedef int32_t file_desc_t;
@@ -39,6 +41,7 @@ bool ReleaseBlock(global_block_id_t targetBlock);
 bool MarkBlockDirty(cache_t *cache, global_block_id_t targetBlock);
 bool BlockIsDirty(cache_t *cache, global_block_id_t targetBlock);
 void test_cache(int argc, char* argv[]);
-byte* ReadOrReserveBlockAndLock(cache_t* cache, global_block_id_t targetBlock, bool* present);
+//byte* ReadOrReserveBlockAndLock(cache_t* cache, global_block_id_t targetBlock, bool* present);
+bool ReadBlockFromCache(cache_t* cache, global_block_id_t global_block_id, bool* present, off_t offset, ssize_t nbyte, int server_id, byte** buffer);
 bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, const byte* toCopy, uint32_t startOffset, uint32_t endPosition, int server_id);
 bool UnlockBlock(cache_t* cache, global_block_id_t targetBlock);

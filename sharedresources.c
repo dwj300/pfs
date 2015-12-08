@@ -29,3 +29,8 @@ int connect_socket(char *host, int port) {
 
     return sockfd;
 }
+
+
+server_t* get_server(int server_id) {
+    return &(servers[server_id]);
+}

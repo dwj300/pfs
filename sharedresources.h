@@ -8,7 +8,7 @@
 
 #define true 1
 #define false 0
-#define BLOCK_IS_FREE 0
+#define BLOCK_IS_FREE -1
 #define MAX_BLOCKS 100
 
 typedef int bool;
@@ -38,3 +38,6 @@ typedef struct server {
 } server_t;
 
 int connect_socket(char *host, int port);
+server_t* get_server(int server_id);
+
+server_t *servers;
