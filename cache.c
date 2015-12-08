@@ -356,7 +356,11 @@ bool ReleaseBlockToCache(cache_t* cache, global_block_id_t blockToRelease) {
 byte * ReadOrReserveBlockAndLock(cache_t* cache, global_block_id_t targetBlock, bool * present){
     block_t * blockInCache = GetBlockFromCache(cache, targetBlock);
     if(!blockInCache){
+        *present = false;
         blockInCache = ReserveBlockInCache(cache, targetBlock);
+    }
+    else{
+        *present = true;
     }
 
     if(blockInCache){
@@ -395,21 +399,33 @@ bool FetchBlockFromServer(cache_t* targetCache, global_block_id_t idOfBlockToFet
 }
 
 
-bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock) {
+//Reserves a space block if the block isn't in the cache already -> what if the block doesn't exist, is written to
+bool WriteToBlockAndMarkDirty(cache_t * cache, global_block_id_t targetBlock, byte * toCopy, uint32_t startOffset, uint32_t endPosition ) {
     block_list_node_t * hostingNode = findBlockNodeInAccessQueue(cache->ActivityTable, targetBlock);
     if(!hostingNode) {
-        return false;
+        //Must get the block from the server previous to writing to it
+        if(!FetchBlockFromServer(cache, targetBlock)){
+            return false;
+        }
+        else{
+            return WriteToBlockAndMarkDirty(cache, targetBlock, toCopy, startOffset, endPosition)
+        }
     }
     else {
-        block_t * toMark = hostingNode->block;
-        pthread_mutex_lock(toMark->lock);
-        if(toMark->dirty){
-            fprintf(stderr, "WARN: block was already dirty\n");
-            pthread_mutex_unlock(toMark->lock);
+        if(startOffset > cache->BlockSize || endPosition > cache->BlockSize || startOffset > endPosition){
+            fprintf(stderr, "Write Offsets are illogical.\n");
+            return false;
+        }
+        block_t * toWriteInto = hostingNode->block;
+        pthread_mutex_lock(toWriteInto->lock);
+        memcpy( ((void*)toWriteInto->data)+startOffset, (void *)toCopy, (endPosition - startOffset) );
+        if(toWriteInto->dirty){
+            //fprintf(stderr, "WARN: block was already dirty\n");
+            pthread_mutex_unlock(toWriteInto->lock);
             return true;
         }
-        toMark->dirty = true;
-        pthread_mutex_unlock(toMark->lock);
+        toWriteInto->dirty = true;
+        pthread_mutex_unlock(toWriteInto->lock);
 
         pthread_mutex_lock(cache->DirtyListLock);
         //Add to dirty list
