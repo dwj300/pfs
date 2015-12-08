@@ -7,7 +7,8 @@
 #define MAX_BLOCKS 100
 
 typedef int bool;
-typedef uint32_t global_block_id_t;
+typedef int32_t global_block_id_t;
+typedef int32_t global_server_id_t;
 
 typedef struct fs_block {
     int server_id;
