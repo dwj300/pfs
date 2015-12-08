@@ -87,31 +87,31 @@ int create_block(char *host, int port, int block_id) {
     int sock_id = connect_socket(host, port);
     create_block_on_fs(sock_id, block_id);
     close(sock_id);
-    return 0;
+    return 1;
 }
 
 int read_block(char *host, int port, int block_id, char **data) {
     int sock_id = connect_socket(host, port);
     read_block_from_fs(sock_id, block_id, data);
     close(sock_id);
-    return 0;
+    return 1;
 }
 
 int write_block(char *host, int port, int block_id, char *data) {
     int sock_id = connect_socket(host, port);
     write_block_on_fs(sock_id, block_id, data);
     close(sock_id);
-    return 0;
+    return 1;
 }
 
 int delete_block(char *host, int port, int block_id) {
     int sock_id = connect_socket(host, port);
     delete_block_on_fs(sock_id, block_id);
     close(sock_id);
-    return 0;
+    return 1;
 }
 
-int main(int argc, char *argv[]) {
+int test_client(int argc, char *argv[]) {
     if (argc < 2) {
         fprintf(stderr, "usage: client [port]\n");
         exit(1);

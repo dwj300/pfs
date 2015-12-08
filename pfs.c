@@ -77,7 +77,58 @@ int pfs_open(const char *filename, const char mode) {
     return fd;
 }
 
+int get_block_from_cache(void **data, int block_id) { 
+    fprintf(stderr, "NOT IMPLEMENTED\n");
+    return 1;
+}
+
 ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache_hit) {
+    int block_id = (offset / (PFS_BLOCK_SIZE * 1024));
+    file_t *file = files[filedes];
+    
+    // if block doesn't exist
+    if ((block_id + 1) >= file->recipe->num_blocks) {
+        // huh?> for write... create (at least 1) block.
+        //FAIL: todo:
+        return -1;
+    }
+    off_t cur_offset = offset % (PFS_BLOCK_SIZE * 1024);
+    ssize_t amt_read = 0;
+    char *temp = malloc(PFS_BLOCK_SIZE * 1024);
+    while(amt_read < nbyte) {
+        int global_block_id = file->recipe->blocks[block_id].block_id;
+        // block not in cache
+        if (get_block_from_cache(temp, global_block_id) == 0) {
+            server_t *server = servers[file->recipe->blocks[block_id].server_id];
+            if (read_block(server.hostname, server.port, global_block_id, char temp) != 1) {
+                fprintf(stderr, "failed to read block from server\n");
+                exit(1);
+            }
+            if (n)
+            memcpy(buf, temp+cur_offset, )
+
+        }
+        // block in cache
+        else {
+
+        }
+        block_id += 1;
+        amt_read += (PFS_BLOCK_SIZE * 1024);
+        buf += (PFS_BLOCK_SIZE * 1024);
+    }
+    // if read token:
+    //int global_block_id = 
+
+    //byte* data = 
+
+    // iterate over blocks
+    //    check for read token
+    //    spawn a thread:
+    //        get from cache
+    //        if cant
+    //            got to network
+    //            unlock block
+    //    thread join
     return -1;
 }
 
@@ -109,7 +160,7 @@ int pfs_delete(const char *filename) {
 }
 
 int pfs_fstat(int filedes, struct pfs_stat *buf) { // Check the config file for the definition of pfs_stat structure
- // must have a read token for last token in file
+    // must have a read token for last token in file
     return -1;
 }
 
