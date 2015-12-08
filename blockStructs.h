@@ -2,12 +2,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <stdint.h>
-#include "sharedresources.h"
 #include <string.h>
-
-typedef int32_t file_desc_t;
-typedef int32_t offset_t;
-typedef char byte;
+#include "sharedresources.h"
 
 // General struct definitions
 typedef struct block{

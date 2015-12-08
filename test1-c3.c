@@ -57,7 +57,8 @@ int main(int argc, char *argv[])
     printf("File Metadata:\n");
     printf("Time of creation: %s\n", ctime(&(mystat.pst_ctime)));
     printf("Time of last modification: %s\n", ctime(&(mystat.pst_mtime)));
-    printf("File Size: %ld\n", mystat.pst_size);
+    printf("File Size: %jd\n", (intmax_t)mystat.pst_size);
+
 
     //Write the next 3 kbytes of data from the input file onto pfs_file
     err_value = pfs_write(fdes, (void *)buf, 3*ONEKB, 8*ONEKB, &cache_hit);
