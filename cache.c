@@ -370,26 +370,6 @@ byte * ReadOrReserveBlockAndLock(cache_t* cache, global_block_id_t targetBlock, 
 }
 
 
-//Place the given data into the given block, with the specified global block id
-//  Returns true on success, false otherwise:
-//      Returns false if the block isn't clear
-bool populateBlock(block_t* targetBlock, byte* data, global_block_id_t id) {
-    if(!targetBlock) {
-        fprintf(stderr, "You cannot populate a NULL block.");
-        return false;
-    }
-    pthread_mutex_lock(targetBlock->lock);
-    if(!blockIsCleared(targetBlock)) {
-        fprintf(stderr, "You cannot populate a uncleared block");
-        return false;
-    }
-    targetBlock->id = id;
-    targetBlock->dirty = false;
-    targetBlock->data = data;
-    pthread_mutex_unlock(targetBlock->lock);
-    return true;
-}
-
 
 bool FetchBlockFromServer(cache_t* targetCache, global_block_id_t idOfBlockToFetch) {
     fprintf(stderr, "ERROR: Not implemented yet\n");
