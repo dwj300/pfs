@@ -1,0 +1,19 @@
+Everything relatex to token management
+-Keep track of tokens on grapevine
+-deal with revokation
+-add appropriate code to client to ask for them
+
+Handle the "complicated case" of reading and writing across multiple blocks
+
+Write fstat
+
+Call flusher thread
+
+Call harvester thread
+
+deal with round robin server assignment
+
+Figure out how to flush to server when client is finished.
+
+
+Write report

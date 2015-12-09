@@ -547,7 +547,7 @@ void * FlushDirtyBlocks(void * cache){
     }
     printUInt(flushed);
     fprintf(stderr, " blocks flushed.\n");
-    pthread_exit(0);
+    //pthread_exit(0);
 }
 
 
@@ -575,11 +575,19 @@ void SpawnHarvester(cache_t * cache){
 }
 
 
+void FlusherThread(cache_t* cache) {
+    while(true) {
+
+    }
+}
+
+
 void SpawnFlusher(cache_t * cache){
+    fprintf(stderr, "Spawning Flusher Thread\n");
     pthread_t * hostThread = (pthread_t *)malloc(sizeof(pthread_t));
-    pthread_create(hostThread, NULL, FlushDirtyBlocks, (void*)cache); //int flusher = ?
+    pthread_create(hostThread, NULL, FlusherThread, (void*)cache); //FlushDirtyBlocks, (void*)cache); //int flusher = ?
     pthread_join(*hostThread, malloc(4));
-    fprintf(stderr, "Done flushing. \n");
+    fprintf(stderr, "Done flushing. \n"); // Should never happen
 }
 
 
