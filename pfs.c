@@ -110,7 +110,14 @@ ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int 
 }
 
 int pfs_close(int filedes) {
-    return -1;
+    // TODO: something with tokens
+    // flush any blocks in the cache to server. 
+    file_t* file = &(files[filedes]);
+    fprintf(stderr, "closing file: %s\n", file->filename);
+    for(int i = 0; i < file->recipe->num_blocks; i++) {
+        FlushBlockToServer(cache, file->recipe->blocks[i].block_id);
+    }
+    return 1;
 }
 
 int pfs_delete(const char *filename) {
@@ -167,4 +174,8 @@ void initialize(int argc, char **argv) {
     print_servers();
     current_fd = 0;
     cache = InitializeCache(PFS_BLOCK_SIZE * 1024, 2048, 80, 20);
+}
+
+void cleanup() {
+    cache->exiting = true;
 }

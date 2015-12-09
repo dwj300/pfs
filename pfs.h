@@ -19,7 +19,7 @@ int pfs_close(int filedes);
 int pfs_delete(const char *filename);
 int pfs_fstat(int filedes, struct pfs_stat *buf); // Check the config file for the definition of pfs_stat structure
 void initialize(int argc, char **argv);
-
+void cleanup();
 
 file_t files[MAX_FILES]; // todo: maybe put this on heap
 cache_t *cache;

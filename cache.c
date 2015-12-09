@@ -13,8 +13,9 @@ bool CacheIsTooVacant(cache_t* cache) {
 //Should only return true if successful and if toPush->dirty has been set to false
 bool pushBlockToServer(block_t* toPush) {
     fprintf(stderr, "Pushing block to server\n");
-    fprintf(stderr, "ERROR: Not implemented yet\n");
-    exit(1);
+    server_t* server = get_server(toPush->host);
+    write_block(server->hostname, server->port, toPush->id, toPush->data);
+    
     toPush->dirty = false;
     //Check if block is the last in the file -> update stat
     return true; //for debugging
@@ -55,31 +56,6 @@ activity_table_t* initializeActivityTable(byte* rawMemoryToManage, uint32_t bloc
             newTable->ActiveBlockMap[i] = NULL;
     }
     return newTable;
-}
-
-cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWaterMarkPercent, float lowWaterMarkPercent) {
-    if(highWaterMarkPercent > 100.0F || highWaterMarkPercent < 0.0F ||
-        lowWaterMarkPercent > 100.0F || lowWaterMarkPercent < 0.0F  ||
-        highWaterMarkPercent < lowWaterMarkPercent) {
-        fprintf(stderr, "Malformated or illogical cache cleanup parameters (for low and/or high water mark).\n");
-        return NULL;
-    }
-
-    cache_t* newCache = (cache_t*)malloc(sizeof(cache_t));
-    newCache->ManagedMemory = (byte*)malloc(blockSize* blockCount);
-
-    newCache->BlockCount = blockCount;
-    newCache->BlockSize = blockSize;
-
-    newCache->HighWaterMark = (uint32_t)((highWaterMarkPercent/100)*blockCount);
-    newCache->LowWaterMark = (uint32_t)((lowWaterMarkPercent/100)*blockCount);
-    newCache->BlockSize = blockSize;
-
-    newCache->DirtyList = NULL;
-    newCache->DirtyListLock = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
-
-    newCache->ActivityTable = initializeActivityTable(newCache->ManagedMemory, blockCount, blockSize);
-    return newCache;
 }
 
 uint32_t lookupMapping(global_block_id_t blockID) {
@@ -170,6 +146,7 @@ bool removeBlockMapping(activity_table_t* hostTable, block_list_node_t* toRemove
     return false;
 }
 
+// TODO: can we delete this???
 block_t* GetBlock(cache_t* cache, global_block_id_t targetBlock) {
     fprintf(stderr, "ERROR: Not implemented yet.\n");
     exit(1);
@@ -229,7 +206,7 @@ bool EvictBlockToCache(cache_t* cache) {
     block_t* toRelease = toEvict->block;
     pthread_mutex_lock(toRelease->lock);
     if( (toRelease->dirty) ) {
-        if( !pushBlockToServer(toRelease) ) {
+        if(!pushBlockToServer(toRelease)) {
             pthread_mutex_unlock(toRelease->lock);
             return false;
         }
@@ -424,6 +401,7 @@ bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, con
     return true;
 }
 
+/*
 uint32_t findWidthUnsigned(uint32_t input) {
     uint32_t width = 1;
     while(input/10 > 0) {
@@ -432,19 +410,21 @@ uint32_t findWidthUnsigned(uint32_t input) {
     }
     return width;
 }
-
+*/
+/*
 char* itoaWrapUn(uint32_t input) {
     char* buf = (char*)malloc( sizeof(char)* (1+findWidthUnsigned(input)));
     sprintf(buf, "%u", input);
     // ultoa(buf, input);
     return buf;
-}
+}*/
 
+/*
 void printUInt(uint32_t input) {
     char* toPrint = itoaWrapUn(input);
     fprintf(stderr, "%s", toPrint);
     free(toPrint);
-}
+}*/
 
 void CacheReport(cache_t* cache) {
     fprintf(stderr, "Used blocks: \n");
@@ -454,16 +434,16 @@ void CacheReport(cache_t* cache) {
         block_mapping_node_t* sentinel = cache->ActivityTable->ActiveBlockMap[i];
         while(sentinel) {
             used++;
-            printUInt(sentinel->mappedBlockNode->block->id);
+            fprintf(stderr, "%u\n", sentinel->mappedBlockNode->block->id);
             if(sentinel->mappedBlockNode->block->dirty)
                 fprintf(stderr, "*");
             fprintf(stderr, ", ");
             sentinel = sentinel->next;
         }
     }
-    fprintf(stderr, "\n");
-    printUInt(used);
-    fprintf(stderr, " total active blocks\n");
+    //fprintf(stderr, "\n");
+    
+    fprintf(stderr, "%u total active blocks\n", used);
 
     if(used != cache->Occupancy)
         fprintf(stderr, "Cache is corrupted, the occupancy state variable is not consistent with the map of active blocks. \n");
@@ -474,8 +454,7 @@ void CacheReport(cache_t* cache) {
     while(sentinel) {
         free++;
         if(sentinel->block->dirty) {
-            printUInt(sentinel->block->id);
-            fprintf(stderr, "*, ");
+            fprintf(stderr, "%u*, ", sentinel->block->id);
             dirtyAndFree = true;
         }
         sentinel = sentinel->next;
@@ -492,13 +471,12 @@ void CacheReport(cache_t* cache) {
 }
 
 // TODO:
-void* FlushDirtyBlocks(void* cache) {
+void FlushDirtyBlocks(cache_t* hostCache) {
     fprintf(stderr, "Starting flushing. \n");
     int flushed = 0;
-    cache_t* hostCache = (cache_t*)cache;
 
     pthread_mutex_lock(hostCache->DirtyListLock);
-    global_block_id_t currentTarget = popIDFromIDList( &(hostCache->DirtyList) );
+    global_block_id_t currentTarget = popIDFromIDList(&(hostCache->DirtyList));
     pthread_mutex_unlock(hostCache->DirtyListLock);
 
     while(currentTarget != BLOCK_IS_FREE) {
@@ -530,48 +508,97 @@ void* FlushDirtyBlocks(void* cache) {
         currentTarget = popIDFromIDList( &(hostCache->DirtyList) );
         pthread_mutex_unlock(hostCache->DirtyListLock);
     }
-    printUInt(flushed);
-    fprintf(stderr, " blocks flushed.\n");
-    //pthread_exit(0);
+    //printUInt(flushed);
+    fprintf(stderr, "%d blocks flushed.\n", flushed);
 }
 
 // TODO:
-void* Harvest(void* cache) {
+void Harvest(cache_t* cache) {
     fprintf(stderr, "Done harvesting. \n");
     int harvested = 0;
 
-    while( CacheIsTooCrowded((cache_t*)cache) ) {
-        if( EvictBlockToCache((cache_t*)cache) ) {
-            harvested ++;
+    while(CacheIsTooCrowded(cache)) {
+        if(EvictBlockToCache(cache)) {
+            harvested += 1;
         }
     }
-    printUInt(harvested);
-    fprintf(stderr, " blocks harvested. \n");
-    pthread_exit(0);
+    //printUInt(harvested);
+    fprintf(stderr, "%d blocks harvested.\n", harvested);
+    //pthread_exit(0);
+}
+
+void* HarvesterThread(void *cache) {
+    // cache_t* hostCache = (cache_t*)cache;
+    //harvest(hostCache);
+    return NULL;
 }
 
 // TODO:
 void SpawnHarvester(cache_t* cache) {
-    pthread_t* hostThread = (pthread_t*)malloc(sizeof(pthread_t));
-    //int harvester =
-    pthread_create(hostThread, NULL, Harvest, (void*)cache);
-    pthread_join(*hostThread, malloc(4));
-    fprintf(stderr, "Done harvesting. \n");
+    //pthread_t* hostThread = (pthread_t*)malloc(sizeof(pthread_t));
+    pthread_create(&threads[1], NULL, HarvesterThread, (void*)cache);
+    //pthread_join(*hostThread, malloc(4));
+    //fprintf(stderr, "Done harvesting. \n");
 }
 
 // TODO:
-void FlusherThread(cache_t* cache) {
+void* FlusherThread(void* cache) {
+    cache_t* hostCache = (cache_t*)cache;
     while(true) {
-
+        FlushDirtyBlocks(hostCache);
+        //if (hostCache->exiting) {
+        //    fprintf(stderr, "Flusher exiting");
+        //    pthread_exit(NULL);
+        //}
+        sleep(30);
     }
 }
 
 void SpawnFlusher(cache_t* cache) {
     fprintf(stderr, "Spawning Flusher Thread\n");
-    pthread_t* hostThread = (pthread_t*)malloc(sizeof(pthread_t));
-    pthread_create(hostThread, NULL, FlusherThread, (void*)cache); //FlushDirtyBlocks, (void*)cache); //int flusher = ?
-    pthread_join(*hostThread, malloc(4));
-    fprintf(stderr, "Done flushing. \n"); // Should never happen
+    //pthread_t* hostThread = (pthread_t*)malloc(sizeof(pthread_t));
+    pthread_create(&threads[0], NULL, FlusherThread, (void*)cache); //FlushDirtyBlocks, (void*)cache); //int flusher = ?
+    //pthread_join(*hostThread, malloc(4)); // We don't wanna block on this...
+    //fprintf(stderr, "Done flushing. \n");
+}
+
+void FlushBlockToServer(cache_t* cache, global_block_id_t id) {
+    // get block
+    block_list_node_t* node = findBlockNodeInAccessQueue(cache->ActivityTable, id);
+    // maybe lock of something???
+    // maybe deal with tokens???
+    // TODO: not sure this is right
+    pushBlockToServer(node->block);
+    // unlock it or something?
+
+}
+
+cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWaterMarkPercent, float lowWaterMarkPercent) {
+    if(highWaterMarkPercent > 100.0F || highWaterMarkPercent < 0.0F ||
+        lowWaterMarkPercent > 100.0F || lowWaterMarkPercent < 0.0F  ||
+        highWaterMarkPercent < lowWaterMarkPercent) {
+        fprintf(stderr, "Malformated or illogical cache cleanup parameters (for low and/or high water mark).\n");
+        return NULL;
+    }
+
+    cache_t* newCache = (cache_t*)malloc(sizeof(cache_t));
+    newCache->exiting = 0;
+    newCache->ManagedMemory = (byte*)malloc(blockSize* blockCount);
+
+    newCache->BlockCount = blockCount;
+    newCache->BlockSize = blockSize;
+
+    newCache->HighWaterMark = (uint32_t)((highWaterMarkPercent/100)*blockCount);
+    newCache->LowWaterMark = (uint32_t)((lowWaterMarkPercent/100)*blockCount);
+    newCache->BlockSize = blockSize;
+
+    newCache->DirtyList = NULL;
+    newCache->DirtyListLock = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
+
+    newCache->ActivityTable = initializeActivityTable(newCache->ManagedMemory, blockCount, blockSize);
+    // SpawnFlusher(newCache);
+    // SpawnHarvester(newCache);
+    return newCache;
 }
 
 void test_cache(int argc, char* argv[]) {
@@ -592,9 +619,9 @@ void test_cache(int argc, char* argv[]) {
         WriteToBlockAndMarkDirty(cache, i, data, 0, 1024, 0);
     }
     CacheReport(cache);
-    SpawnHarvester(cache);
+    //SpawnHarvester(cache);
     CacheReport(cache);
-    SpawnFlusher(cache);
+    //SpawnFlusher(cache);
     CacheReport(cache);
 
 /*
