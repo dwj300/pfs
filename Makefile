@@ -29,4 +29,4 @@ cache: test_cache.c cache.c blockStructs.c client.c sharedresources.c
 	$(CC) $(CFLAGS) $(CFLAGS2) test_cache test_cache.c cache.c blockStructs.c client.c sharedresources.c
 
 clean:
-	rm c1 c2 c3 client server cache grapevine test
+	rm c1 c2 c3 client server cache grapevine test test_cache dict dummyc; rm -r *.dSYM
