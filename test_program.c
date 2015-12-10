@@ -5,12 +5,12 @@ int main(int argc, char* argv[]) {
     pfs_create("foo.txt", 1);
     int fd = pfs_open("foo.txt", 'w');
     char *data = "test data123";
-    //char *data1 = malloc(sizeof(data)+1);
+    char *data1 = malloc(sizeof(data)+1);
     int cache_hit;
-    //int cache_hit2;
+    int cache_hit2;
     pfs_write(fd, data, strlen(data)+1, 0, &cache_hit);
-    //pfs_read(fd, data1, strlen(data)+1, 0, &cache_hit);
-    //fprintf(stderr, "data:%s\n", data1);
+    pfs_read(fd, data1, strlen(data)+1, 0, &cache_hit);
+    fprintf(stderr, "data:%s\n", data1);
     pfs_close(fd);
     //cleanup();*/
     /*if (fd == -1) {

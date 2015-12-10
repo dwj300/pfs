@@ -18,12 +18,16 @@ int read_block_from_fs(int socket_fd, int block_id, byte** buffer)  {
 }
 
 int write_block_on_fs(int socket_fd, int block_id, byte* data) {
-    char command[1042];
-    sprintf(command, "WRITE %d", block_id);
+    fprintf(stderr, "data:%.*s\n", 10, data);
+    char* command = calloc(1042,sizeof(char));
+    sprintf(command, "WRITE %d ", block_id); // the weird space is cause the null terminator is being weird
     int l = strlen(command);
-    void *start = command + (sizeof(char) * l) + 1;
-    memcpy(start, data, 1024);
-    int n = write(socket_fd, command, (1024 + l + 1));
+    fprintf(stderr, "length:%d\n", l);
+    void *start = command + l;// + (sizeof(char) * l) + 1;
+    memcpy(start, data, 10);
+    fprintf(stderr, "%.*s\n", 20, command);
+    
+    int n = write(socket_fd, command, 1024 + l); //(1024 + l + 1));
     if (n < 0) {
         fprintf(stderr, "error writing data");
         return -1;

@@ -76,7 +76,7 @@ void client_create_block(file_t *file) {
     char* command = malloc(269*sizeof(char));
     sprintf(command, "C_BLOCK %s", file->filename);
     int socket_fd = connect_socket(grapevine_host, grapevine_port);
-    write(socket_fd, command, strlen(command)+1);
+    write(socket_fd, command, strlen(command));
     recipe_t* recipe = malloc(sizeof(recipe_t));
     read(socket_fd, recipe, sizeof(recipe_t));
     close(socket_fd);
@@ -105,7 +105,7 @@ ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int 
     int gid = file->recipe->blocks[block_id].block_id; // TODO: change api to be offset and size
     WriteToBlockAndMarkDirty(cache, gid, buf, offset_within_block, offset_within_block+nbyte, file->recipe->blocks[block_id].server_id); // TODO: also pass server????
 
-    fprintf(stderr, "new recipe blocks!: %d", file->recipe->num_blocks);
+    fprintf(stderr, "new recipe blocks!: %d\n", file->recipe->num_blocks);
     return -1;
 }
 
