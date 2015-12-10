@@ -13,7 +13,7 @@ Call flusher thread (have an idea for this, actually all of the code for this is
 Call harvester thread (not )
 
 deal with round robin server assignment
-DONE (assuming that is correct assumption)
+NOT DONE
 
 Figure out how to flush to server when client is finished.
 DONE (did it via pfs_close)

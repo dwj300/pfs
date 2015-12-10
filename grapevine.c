@@ -52,7 +52,6 @@ int delete_file(int socket_fd, char* filename) {
 
         free(file->stat);
         free(file->recipe);
-        free(file->filename);
         free(file);
         int success = delete(files, filename);
         write(socket_fd, &success, sizeof(int));
