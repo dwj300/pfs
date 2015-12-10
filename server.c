@@ -3,11 +3,11 @@
 int create_block(char* block_id) {
     FILE *file = fopen(block_id, "w+");
     if (file == NULL) {
-        fprintf(stderr, "cannot create file\n");
+        fprintf(stderr, "cannot create block\n");
         return -1;
     }
     fclose(file);
-    fprintf(stderr, "Creating file!\n");
+    fprintf(stderr, "Creating block!\n");
     return 0;
 }
 

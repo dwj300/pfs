@@ -9,7 +9,7 @@ int main(int argc, char* argv[]) {
     int cache_hit;
     int cache_hit2;
     pfs_write(fd, data, strlen(data)+1, 0, &cache_hit);
-    pfs_read(fd, data1, strlen(data)+1, 0, &cache_hit);
+    pfs_read(fd, data1, strlen(data)+1, 0, &cache_hit2);
     fprintf(stderr, "data:%s\n", data1);
     pfs_close(fd);
     //cleanup();*/

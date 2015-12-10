@@ -73,6 +73,7 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
 }
 
 void client_create_block(file_t *file) {
+    fprintf(stderr, "creating a new block!\n");
     char* command = malloc(269*sizeof(char));
     sprintf(command, "C_BLOCK %s", file->filename);
     int socket_fd = connect_socket(grapevine_host, grapevine_port);
@@ -85,28 +86,39 @@ void client_create_block(file_t *file) {
         fprintf(stderr, "Failed to create a new block.");
         exit(1);
     }
-    fprintf(stderr, "try1: %d\n", file->recipe->blocks[0].block_id);
+    fprintf(stderr, "New num_blocks: %d\n", file->recipe->num_blocks);
 }
 
 ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int *cache_hit) {
     file_t *file = &(files[filedes]);
-
-    int block_id = offset / (1024*PFS_BLOCK_SIZE);
-    int offset_within_block = offset - (block_id*1024*PFS_BLOCK_SIZE);
-    if (block_id+1 >= file->recipe->num_blocks) {
-        // Need to create a block. (matbe more. TODO: fix dis)
-        client_create_block(file);
-        fprintf(stderr, "try1: %d\n", file->recipe->blocks[0].block_id);
-
-        fprintf(stderr, "BLOCK_ID: %d\n", files[filedes].recipe->blocks[block_id].block_id);
-
+    const void* current_pos = buf;
+    int start_block_id = offset / (1024*PFS_BLOCK_SIZE);
+    int end_block_id = (offset + nbyte-1) / (1024*PFS_BLOCK_SIZE);
+    int current_offset = offset - (start_block_id*1024*PFS_BLOCK_SIZE);
+    int bytes_written = 0;
+    for(int i = start_block_id; i <= end_block_id; i++) {
+        if (i+1 >= file->recipe->num_blocks) {
+            // Need to create a block on server. (matbe more. TODO: fix dis)
+            client_create_block(file);
+            fprintf(stderr, "new block id: %d\n", file->recipe->blocks[i].block_id);
+            fprintf(stderr, "BLOCK_ID: %d\n", files[filedes].recipe->blocks[i].block_id);
+        }
+        int end_position = current_offset + (nbyte - bytes_written);
+        if (end_position > 1024) {
+            end_position = 1024;
+        }
+        WriteToBlockAndMarkDirty(cache, file->recipe->blocks[i].block_id, current_pos, current_offset, end_position, file->recipe->blocks[i].server_id);
+        current_pos += (end_position - current_offset);
+        bytes_written += (end_position - current_offset);
+        current_offset = 0;
     }
+    
     // TODO: change cache write to be a constant void * to match API.
-    int gid = file->recipe->blocks[block_id].block_id; // TODO: change api to be offset and size
-    WriteToBlockAndMarkDirty(cache, gid, buf, offset_within_block, offset_within_block+nbyte, file->recipe->blocks[block_id].server_id); // TODO: also pass server????
+    //int gid = file->recipe->blocks[block_id].block_id; // TODO: change api to be offset and size
+    //WriteToBlockAndMarkDirty(cache, gid, buf, offset_within_block, offset_within_block+nbyte, file->recipe->blocks[block_id].server_id); // TODO: also pass server????
 
-    fprintf(stderr, "new recipe blocks!: %d\n", file->recipe->num_blocks);
-    return -1;
+    //fprintf(stderr, "new recipe blocks!: %d\n", file->recipe->num_blocks);
+    return bytes_written;
 }
 
 int pfs_close(int filedes) {

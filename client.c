@@ -24,7 +24,7 @@ int write_block_on_fs(int socket_fd, int block_id, byte* data) {
     int l = strlen(command);
     fprintf(stderr, "length:%d\n", l);
     void *start = command + l;// + (sizeof(char) * l) + 1;
-    memcpy(start, data, 10);
+    memcpy(start, data, 1024);
     fprintf(stderr, "%.*s\n", 20, command);
     
     int n = write(socket_fd, command, 1024 + l); //(1024 + l + 1));
