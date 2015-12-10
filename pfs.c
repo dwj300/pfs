@@ -93,7 +93,7 @@ ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int 
     file_t *file = &(files[filedes]);
     const void* current_pos = buf;
     int start_block_id = offset / (1024*PFS_BLOCK_SIZE);
-    int end_block_id = (offset + nbyte-1) / (1024*PFS_BLOCK_SIZE);
+    int end_block_id = (offset + nbyte - 1) / (1024*PFS_BLOCK_SIZE);
     int current_offset = offset - (start_block_id*1024*PFS_BLOCK_SIZE);
     int bytes_written = 0;
     for(int i = start_block_id; i <= end_block_id; i++) {

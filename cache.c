@@ -562,13 +562,19 @@ void SpawnFlusher(cache_t* cache) {
     //fprintf(stderr, "Done flushing. \n");
 }
 
+// public method
 void FlushBlockToServer(cache_t* cache, global_block_id_t id) {
+    // check if block is dirty
     // get block
     block_list_node_t* node = findBlockNodeInAccessQueue(cache->ActivityTable, id);
+    if(node && node->block->dirty) {
+        pushBlockToServer(node->block);
+        node->block->dirty = false; // ??? not sure...
+    }
     // maybe lock of something???
     // maybe deal with tokens???
     // TODO: not sure this is right
-    pushBlockToServer(node->block);
+    
     // unlock it or something?
 
 }

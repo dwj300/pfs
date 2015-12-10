@@ -21,7 +21,7 @@ int main(int argc, char *argv[])
 {
     int ifdes, fdes;
     int err_value;
-    char input_fname[20];
+    char* input_fname = "tocopy.txt"; //[20];
     char *buf;
     //ssize_t nread;
     int cache_hit;
@@ -30,12 +30,12 @@ int main(int argc, char *argv[])
     initialize(argc, argv);
 
     // the command line arguments include an input filename
-    if (argc < 2)
+    /*if (argc < 2)
     {
         printf("usage: a.out <input filename>\n");
         exit(0);
     }
-    strcpy(input_fname, argv[1]);
+    strcpy(input_fname, argv[1]);*/
     ifdes = open(input_fname, O_RDONLY);
     buf = (char *)malloc(5*ONEKB);
     // nread = pread(ifdes, (void *)buf, 4*ONEKB,4*ONEKB);
