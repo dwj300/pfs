@@ -27,7 +27,7 @@ int main(int argc, char* argv[]) {
     void* data1 = malloc(10*1024);
     int fd = pfs_open("pfs_file1", 'r');
     pfs_read(fd, data1, 4*1024, 0, &cache_hit2);
-    fprintf(stderr, "DATA%.*s\n", 4096, data1);
+    fprintf(stderr, "DATA%.*s\n", 4096, (char*)data1);
 
     return 0;
 }
