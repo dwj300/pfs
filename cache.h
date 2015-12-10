@@ -40,6 +40,6 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
 void test_cache(int argc, char* argv[]);
 //byte* ReadOrReserveBlockAndLock(cache_t* cache, global_block_id_t targetBlock, bool* present);
 bool ReadBlockFromCache(cache_t* cache, global_block_id_t global_block_id, bool* present, off_t offset, ssize_t nbyte, int server_id, byte** buffer);
-bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, const byte* toCopy, uint32_t startOffset, uint32_t endPosition, int server_id);
+bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, const byte* toCopy, uint32_t startOffset, uint32_t endPosition, int server_id, int* present);
 //bool UnlockBlock(cache_t* cache, global_block_id_t targetBlock); delete???
 void FlushBlockToServer(cache_t* cache, global_block_id_t id);

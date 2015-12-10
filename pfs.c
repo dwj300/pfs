@@ -36,18 +36,21 @@ int pfs_open(const char *filename, const char mode) {
     fprintf(stderr, "COMMAND: %s\n", command);
     int length = strlen(command);
     write(socket_fd, command, length+1); // +1 for null terminator. Not sure if needed
-    recipe_t *recipe = malloc(sizeof(recipe_t));
+    recipe_t* recipe = malloc(sizeof(recipe_t));
+    pfs_stat_t *stats = malloc(sizeof(pfs_stat_t));
     read(socket_fd, recipe, sizeof(recipe_t));
     files[fd].recipe = recipe;
     if(files[fd].recipe->num_blocks == -1) {
         fprintf(stderr, "Could not open %s. file does not exist\n", filename);
         return -1;
     }
-    
+    read(socket_fd, stats, sizeof(pfs_stat_t));
     close(socket_fd);
+    files[fd].stat = stats;
     return fd;
 }
 
+// TODO: token logic
 ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache_hit) {
     *cache_hit = 1;
     file_t *file = &(files[filedes]);
@@ -79,26 +82,6 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
         current_offset = 0;
     }
     return bytes_read;
-    /*
-    // This is the easy, single block case.
-    // assume read token...
-    if ((offset + nbyte) <= (PFS_BLOCK_SIZE * 1024)) {
-        int block_id = 0;
-        int global_block_id = file.recipe->blocks[block_id].block_id;
-        bool success = ReadBlockFromCache(cache, global_block_id, cache_hit, offset, nbyte, file.recipe->blocks[block_id].server_id, buf);
-        if (!success) {
-            fprintf(stderr, "Failed to read data\n");
-            return -1;
-        }
-        if((*cache_hit) == false) {
-            //server_t server = servers[file.recipe->blocks[block_id].server_id];
-            //read_block(server.hostname, server.port, global_block_id, &addr);
-            //UnlockBlock(cache, global_block_id);
-        }
-        //memcpy(buf, addr+offset, nbyte);
-        return nbyte;
-    }
-    return 0;*/
 }
 
 void client_create_block(file_t *file) {
@@ -119,7 +102,9 @@ void client_create_block(file_t *file) {
 }
 
 // TODO: deal with cache hit ...
+// TODO: token logic
 ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int *cache_hit) {
+    *cache_hit = 1;
     file_t *file = &(files[filedes]);
     const void* current_pos = buf;
     int start_block_id = offset / (1024*PFS_BLOCK_SIZE);
@@ -137,7 +122,9 @@ ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int 
         if (end_position > 1024) {
             end_position = 1024;
         }
-        WriteToBlockAndMarkDirty(cache, file->recipe->blocks[i].block_id, current_pos, current_offset, end_position, file->recipe->blocks[i].server_id);
+        int hit;
+        WriteToBlockAndMarkDirty(cache, file->recipe->blocks[i].block_id, current_pos, current_offset, end_position, file->recipe->blocks[i].server_id, &hit);
+        *cache_hit = *cache_hit & hit;
         current_pos += (end_position - current_offset);
         bytes_written += (end_position - current_offset);
         current_offset = 0;
@@ -182,7 +169,8 @@ int pfs_delete(const char *filename) {
 
 int pfs_fstat(int filedes, struct pfs_stat *buf) { // Check the config file for the definition of pfs_stat structure
     // must have a read token for last token in file
-    return -1;
+    memcpy(buf, files[filedes].stat, sizeof(pfs_stat_t));
+    return 1;
 }
 
 server_t* get_servers() {
@@ -202,7 +190,6 @@ void print_servers() {
     }
 }
 
-
 //void print_rec
 
 void initialize(int argc, char **argv) {
@@ -219,5 +206,5 @@ void initialize(int argc, char **argv) {
 }
 
 void cleanup() {
-    cache->exiting = true;
+    cache->exiting = true; // TODO: probably not needed 
 }

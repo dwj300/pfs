@@ -14,9 +14,16 @@ int create_file(int socket_fd, char* filename, int stripe_width) {
     else {
         file_t* file = malloc(sizeof(file_t));
         file->filename = filename;
+        pfs_stat_t* stat = malloc(sizeof(pfs_stat_t));
+        stat->pst_size = 0;
+        stat->pst_ctime = time(0);
+        stat->pst_mtime = time(0);
+        file->stat = stat;
+
         recipe_t *recipe = malloc(sizeof(recipe_t));
         recipe->num_blocks = 0;
         file->recipe = recipe;
+
         insert(files, filename, file);
         int success = 1;
         write(socket_fd, &success, sizeof(int));
@@ -34,11 +41,22 @@ int delete_file(int socket_fd, char* filename) {
         return 0;
     }
     else {
-        //file_t* file = (file_t*)node->value;
+        file_t* file = (file_t*)node->value;
         // delete blocks off file servers
         //free(file);
+        for(int i = 0; i < file->recipe->num_blocks; i++) {
+            server_t *server = &(servers[file->recipe->blocks[i].server_id]);
+            fprintf(stderr, "Deleting block: %d from %s:%d\n", file->recipe->blocks[i].block_id, server->hostname, server->port);
+            delete_block(server->hostname, server->port, file->recipe->blocks[i].block_id);
+        }
+
+        free(file->stat);
+        free(file->recipe);
+        free(file->filename);
+        free(file);
         int success = delete(files, filename);
         write(socket_fd, &success, sizeof(int));
+        //close(socket_fd);
     }
     return 1;
 }
@@ -55,6 +73,8 @@ int open_file(int socket_fd, char* filename) {
     }
     file_t* file = (file_t*)e->value;
     write(socket_fd, file->recipe, sizeof(recipe_t));
+    write(socket_fd, file->stat, sizeof(pfs_stat_t));
+
     close(socket_fd);
     return 1;
 }
@@ -107,7 +127,9 @@ int create_block_gv(int socket_fd, char *filename) {
     // send back new recipe?
     write(socket_fd, file->recipe, sizeof(recipe_t));
     close(socket_fd);
+    file->stat->pst_size += 1024 * PFS_BLOCK_SIZE;
     current_block_id += 1;
+
     
     return gid;
 }

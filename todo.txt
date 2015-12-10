@@ -4,16 +4,26 @@ Everything relatex to token management
 -add appropriate code to client to ask for them
 
 Handle the "complicated case" of reading and writing across multiple blocks
+DONE
 
 Write fstat
+DONE (deal with stale entries)
 
-Call flusher thread
-
-Call harvester thread
+Call flusher thread (have an idea for this, actually all of the code for this is written we are just missing one line.
+Call harvester thread (not )
 
 deal with round robin server assignment
+DONE (assuming that is correct assumption)
 
 Figure out how to flush to server when client is finished.
+DONE (did it via pfs_close)
+
+
+write delete
 
 
 Write report
+
+future todo:
+Retry logic
+multi thread read / write (shouldn't be too hard)

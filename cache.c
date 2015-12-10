@@ -361,7 +361,7 @@ bool FetchBlockFromServer(cache_t* cache, global_block_id_t idOfBlockToFetch, in
 }
 
 //Reserves a space block if the block isn't in the cache already -> what if the block doesn't exist, is written to
-bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, const byte* toCopy, uint32_t startOffset, uint32_t endPosition, int server_id) {
+bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, const byte* toCopy, uint32_t startOffset, uint32_t endPosition, int server_id, int* present) {
     block_t* toWriteInto = GetBlockFromCache(cache, targetBlock);
     if(!toWriteInto) {
         //Must get the block from the server previous to writing to it
@@ -369,7 +369,8 @@ bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, con
             return false;
         }
         else{
-            return WriteToBlockAndMarkDirty(cache, targetBlock, toCopy, startOffset, endPosition, server_id);
+            *present = 0;
+            return WriteToBlockAndMarkDirty(cache, targetBlock, toCopy, startOffset, endPosition, server_id, present);
         }
     }
     else {
@@ -622,7 +623,8 @@ void test_cache(int argc, char* argv[]) {
     for(i = 1; i <= blockCount; i++) {
         ReserveBlockInCache(cache, i);
         byte* data = malloc(blockSize);
-        WriteToBlockAndMarkDirty(cache, i, data, 0, 1024, 0);
+        int present;
+        WriteToBlockAndMarkDirty(cache, i, data, 0, 1024, 0, &present);
     }
     CacheReport(cache);
     //SpawnHarvester(cache);

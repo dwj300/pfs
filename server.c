@@ -40,6 +40,8 @@ int read_block(int socket_fd, char* block_id) {
 }
 
 int delete_block(char* block_id){
+    fprintf(stderr, "Deleting block\n");
+
     int n = remove(block_id);
     if (n < 0) {
         fprintf(stderr, "Error deleting file\n");

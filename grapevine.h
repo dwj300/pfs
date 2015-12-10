@@ -12,6 +12,7 @@
 #include "dictionary.h"
 #include "config.h"
 #include "client.h"
+#include "time.h"
 
 server_t *servers;
 dictionary_t files;
