@@ -27,3 +27,14 @@ Write report
 future todo:
 Retry logic
 multi thread read / write (shouldn't be too hard)
+
+
+modification time
+
+add ability to get stat after opening...
+
+possibly move FD to the server...
+
+probably need to keep track of whose accesing which files....ugh
+
+need to deal with revokation.

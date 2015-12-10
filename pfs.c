@@ -1,5 +1,87 @@
 #include "pfs.h"
 
+bool check_read_token(file_t* file, int block_index) {
+    token_node_t* cur = file->read_tokens;
+    while(cur != NULL) {
+        token_t* token = cur->token;
+        if ((token->start_block <= block_index) && (block_index <= token->end_block)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+bool check_write_token(file_t* file, int block_index) {
+    token_node_t* cur = file->write_tokens;
+    while(cur != NULL) {
+        token_t* token = cur->token;
+        if ((token->start_block <= block_index) && (block_index <= token->end_block)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+void add_token(file_t* file, token_t* token, bool read) {
+    token_node_t* node = malloc(sizeof(token_node_t));
+    node->token = token;
+    node->next = NULL;
+    //variable = condition ? value_if_true : value_if_false
+    token_node_t* cur = (read == true) ? file->read_tokens : file->write_tokens;
+    
+    while(cur != NULL && cur->next != NULL) {
+        cur = cur->next;
+    }
+    if(cur == NULL) {
+        if (read == true) {
+            file->read_tokens = node;
+        }
+        else {
+            file->write_tokens = node;   
+        }
+    }
+    else {
+        cur->next = node;
+    }
+}
+
+bool get_read_token(file_t* file, int block_index) {
+    int socket_fd = connect_socket(grapevine_host, grapevine_port);
+    if (socket_fd < 0) {
+        fprintf(stderr, "Failed to open socket\n");
+        exit(1);
+    }
+    char* command = malloc(269*sizeof(char));
+    sprintf(command, "READ_TOKEN %s %d", file->filename, block_index);
+    fprintf(stderr, "COMMAND:%sdone\n", command);
+    int length = strlen(command);
+    write(socket_fd, command, length+1);
+    token_t* token = malloc(sizeof(token_t));
+    read(socket_fd, token, sizeof(token_t));
+    fprintf(stderr, "New read token: %d->%d\n", token->start_block, token->end_block);
+    add_token(file, token, true);
+    close(socket_fd);
+    return true;
+}
+
+bool get_write_token(file_t* file, int block_index) {
+    int socket_fd = connect_socket(grapevine_host, grapevine_port);
+    if (socket_fd < 0) {
+        fprintf(stderr, "Failed to open socket\n");
+        exit(1);
+    }
+    char* command = malloc(269*sizeof(char));
+    sprintf(command, "WRITE_TOKEN %s %d", file->filename, block_index);
+    fprintf(stderr, "COMMAND:%sdone\n", command);
+    int length = strlen(command);
+    write(socket_fd, command, length+1);
+    token_t* token = malloc(sizeof(token_t));
+    read(socket_fd, token, sizeof(token_t));
+    fprintf(stderr, "New write token: %d->%d\n", token->start_block, token->end_block);
+    add_token(file, token, false);
+    close(socket_fd);
+    return true;
+}
 // assume 255 max filename
 int pfs_create(const char *filename, int stripe_width) {
     int socket_fd = connect_socket(grapevine_host, grapevine_port);
@@ -50,10 +132,27 @@ int pfs_open(const char *filename, const char mode) {
     return fd;
 }
 
+void client_create_block(file_t *file) {
+    fprintf(stderr, "creating a new block!\n");
+    char* command = malloc(269*sizeof(char));
+    sprintf(command, "C_BLOCK %s", file->filename);
+    int socket_fd = connect_socket(grapevine_host, grapevine_port);
+    write(socket_fd, command, strlen(command));
+    recipe_t* recipe = malloc(sizeof(recipe_t));
+    read(socket_fd, recipe, sizeof(recipe_t));
+    close(socket_fd);
+    file->recipe = recipe;
+    if (file->recipe->num_blocks == -1) {
+        fprintf(stderr, "Failed to create a new block.");
+        exit(1);
+    }
+    fprintf(stderr, "New num_blocks: %d\n", file->recipe->num_blocks);
+}
+
 // TODO: token logic
 ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache_hit) {
     *cache_hit = 1;
-    file_t *file = &(files[filedes]);
+    file_t* file = &(files[filedes]);
     void* current_pos = buf;
     int start_block_id = offset / (1024*PFS_BLOCK_SIZE);
     int end_block_id = (offset + nbyte - 1) / (1024*PFS_BLOCK_SIZE); // the -1 is for the multiple of 1024 case.
@@ -65,7 +164,10 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
             fprintf(stderr, "block doesn't exist.\n");
             return -1;
         }
-        
+        if(!check_read_token(file, i)) {
+            get_read_token(file, i);
+        }
+
         int end_position = current_offset + (nbyte - bytes_read);
         if (end_position > 1024) {
             end_position = 1024;
@@ -82,23 +184,6 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
         current_offset = 0;
     }
     return bytes_read;
-}
-
-void client_create_block(file_t *file) {
-    fprintf(stderr, "creating a new block!\n");
-    char* command = malloc(269*sizeof(char));
-    sprintf(command, "C_BLOCK %s", file->filename);
-    int socket_fd = connect_socket(grapevine_host, grapevine_port);
-    write(socket_fd, command, strlen(command));
-    recipe_t* recipe = malloc(sizeof(recipe_t));
-    read(socket_fd, recipe, sizeof(recipe_t));
-    close(socket_fd);
-    file->recipe = recipe;
-    if (file->recipe->num_blocks == -1) {
-        fprintf(stderr, "Failed to create a new block.");
-        exit(1);
-    }
-    fprintf(stderr, "New num_blocks: %d\n", file->recipe->num_blocks);
 }
 
 // TODO: deal with cache hit ...
@@ -118,6 +203,11 @@ ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int 
             fprintf(stderr, "new block id: %d\n", file->recipe->blocks[i].block_id);
             fprintf(stderr, "BLOCK_ID: %d\n", files[filedes].recipe->blocks[i].block_id);
         }
+
+        if(!check_write_token(file, i)) {
+            get_write_token(file, i);
+        }
+
         int end_position = current_offset + (nbyte - bytes_written);
         if (end_position > 1024) {
             end_position = 1024;

@@ -19,6 +19,8 @@ int create_file(int socket_fd, char* filename, int stripe_width) {
         stat->pst_ctime = time(0);
         stat->pst_mtime = time(0);
         file->stat = stat;
+        file->is_writing = false;
+        file->stripe_width = stripe_width; // TODO: actually use this.
 
         recipe_t *recipe = malloc(sizeof(recipe_t));
         recipe->num_blocks = 0;
@@ -29,6 +31,67 @@ int create_file(int socket_fd, char* filename, int stripe_width) {
         write(socket_fd, &success, sizeof(int));
     }
     return 1;
+}
+
+void get_read_token(int socket_fd, char* filename, int block_index) {
+    // easy case for now. we can fix logic once we get tokens sending over the wire
+    // TODO
+    entry_t* e = lookup(files, filename);
+
+    if (e == NULL) {
+        fprintf(stderr, "File with name:%s doesn't exists.\n", filename);
+        token_t* token = malloc(sizeof(token_t));
+        token->start_block = -1;
+        token->end_block = -1;
+        write(socket_fd, token, sizeof(token_t));
+        close(socket_fd);
+        return;
+    }
+    else {
+        file_t* file = e->value;
+        // easy case
+        if (file->is_writing == false) {
+            token_t* token = malloc(sizeof(token_t));
+            token->start_block = 0;
+            token->end_block = file->recipe->num_blocks - 1;
+            write(socket_fd, token, sizeof(token_t));
+            close(socket_fd);
+        }
+        else {
+            // some really complicated logic
+            // TODO
+            fprintf(stderr, "ERROR: Not implemented yet\n");
+            exit(1);         
+        }
+    }
+}
+
+void get_write_token(int socket_fd, char* filename, int block_index) {
+    // this is complicated. psuedocode for now
+    // TODO
+    entry_t* e = lookup(files, filename);
+
+    if (e == NULL) {
+        fprintf(stderr, "File with name:%s doesn't exists.\n", filename);
+        token_t* token = malloc(sizeof(token_t));
+        token->start_block = -1;
+        token->end_block = -1;
+        write(socket_fd, token, sizeof(token_t));
+        close(socket_fd);
+        return;
+    }
+    else {
+        fprintf(stderr, "ERROR: Not implemented yet\n");
+        exit(1); 
+        // some really complicated logic
+        // TODO
+        // file_t* file = e->value;
+        /*token_t* token = malloc(sizeof(token_t));
+        token->start_block = 0;
+        token->end_block = file->recipe->num_blocks - 1;
+        write(socket_fd, token, sizeof(token_t));
+        close(socket_fd);*/
+    }
 }
 
 int delete_file(int socket_fd, char* filename) {
@@ -129,7 +192,6 @@ int create_block_gv(int socket_fd, char *filename) {
     file->stat->pst_size += 1024 * PFS_BLOCK_SIZE;
     current_block_id += 1;
 
-    
     return gid;
 }
 
@@ -248,10 +310,19 @@ int main(int argc, char* argv[]) {
             char* filename = (char*)data1;
             create_block_gv(newsockfd, filename);
         }
-        /*
-        else if (strcmp(opcode, "WRITE") == 0) {
-            write_block(block_id, data);
+        
+        else if (strcmp(opcode, "READ_TOKEN") == 0) {
+            char* filename = (char*)data1;
+            char* block_index_str = (char*)data2;
+            int block_index = atoi(block_index_str);
+            get_read_token(newsockfd, filename, block_index);
         }
+        else if (strcmp(opcode, "WRITE_TOKEN") == 0) {
+            char* filename = (char*)data1;
+            char* block_index_str = (char*)data2;
+            int block_index = atoi(block_index_str);
+            get_write_token(newsockfd, filename, block_index);
+        }/*
         else if (strcmp(opcode, "FSTAT") == 0) {
             delete_block(block_id);
         }*/

@@ -18,6 +18,16 @@ typedef char byte;
 typedef int32_t global_block_id_t;
 typedef int32_t global_server_id_t;
 
+typedef struct token {
+    int start_block;
+    int end_block;
+} token_t;
+
+typedef struct token_node {
+    token_t* token;
+    struct token_node* next;
+} token_node_t;
+
 typedef struct fs_block {
     int server_id;
     int block_id;
@@ -29,15 +39,21 @@ typedef struct recipe {
 } recipe_t;
 
 typedef struct file {
-    const char* filename;
+    const char* filename; //idk why this is a const
+    int stripe_width;
     struct pfs_stat* stat;
     recipe_t* recipe;
+    token_node_t* read_tokens;
+    token_node_t* write_tokens;
+    bool is_writing; // TODO: this needs to go, I just have it to test if sending tokens works
 } file_t;
 
 typedef struct server {
     char hostname[255];
     int port;
 } server_t;
+
+
 
 int connect_socket(char *host, int port);
 server_t* get_server(int server_id);
