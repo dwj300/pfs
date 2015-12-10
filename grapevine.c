@@ -94,15 +94,21 @@ int create_block_gv(int socket_fd, char *filename) {
     fprintf(stderr, "1\n");
     fprintf(stderr, "foo2\n");
 
-    file->recipe->blocks[file->recipe->num_blocks].server_id = 0; // TODO: Round robin?
+    int server = (current_server_id % NUM_FILE_SERVERS);
+    current_server_id += 1;
+
+    file->recipe->blocks[file->recipe->num_blocks].server_id = server; // TODO: Round robin?
+    fprintf(stderr, "assigning server %d\n", server);
+    
     file->recipe->num_blocks += 1;
     fprintf(stderr, "block_id:%d\n", file->recipe->blocks[0].block_id);
     // Create block on server.
-    create_block(servers[0].hostname, servers[0].port, gid);
+    create_block(servers[server].hostname, servers[server].port, gid);
     // send back new recipe?
     write(socket_fd, file->recipe, sizeof(recipe_t));
     close(socket_fd);
     current_block_id += 1;
+    
     return gid;
 }
 
@@ -137,7 +143,7 @@ void initialize() {
     servers[0].port = 8081;
     strcpy(servers[1].hostname, "localhost");
     servers[1].port = 8082;
-    current_block_id = 1;
+    current_server_id = 0;
 }
 
 int main(int argc, char* argv[]) {

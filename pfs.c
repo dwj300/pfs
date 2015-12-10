@@ -49,7 +49,37 @@ int pfs_open(const char *filename, const char mode) {
 }
 
 ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache_hit) {
-    file_t file = files[filedes];
+    *cache_hit = 1;
+    file_t *file = &(files[filedes]);
+    void* current_pos = buf;
+    int start_block_id = offset / (1024*PFS_BLOCK_SIZE);
+    int end_block_id = (offset + nbyte - 1) / (1024*PFS_BLOCK_SIZE); // the -1 is for the multiple of 1024 case.
+    int current_offset = offset - (start_block_id*1024*PFS_BLOCK_SIZE);
+    int bytes_read = 0;
+    for(int i = start_block_id; i <= end_block_id; i++) {
+        if (i+1 >= file->recipe->num_blocks) {
+            // Block doesn't exist... fail.
+            fprintf(stderr, "block doesn't exist.\n");
+            return -1;
+        }
+        
+        int end_position = current_offset + (nbyte - bytes_read);
+        if (end_position > 1024) {
+            end_position = 1024;
+        }
+        int hit;
+        bool success = ReadBlockFromCache(cache, file->recipe->blocks[i].block_id, &hit, current_offset, (end_position - current_offset), file->recipe->blocks[i].server_id, current_pos);
+        if (!success) {
+            fprintf(stderr, "Failed to read data\n");
+            return -1;
+        }
+        *cache_hit = (*cache_hit) & hit;
+        current_pos += (end_position - current_offset);
+        bytes_read += (end_position - current_offset);
+        current_offset = 0;
+    }
+    return bytes_read;
+    /*
     // This is the easy, single block case.
     // assume read token...
     if ((offset + nbyte) <= (PFS_BLOCK_SIZE * 1024)) {
@@ -68,8 +98,7 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
         //memcpy(buf, addr+offset, nbyte);
         return nbyte;
     }
-    return 0;
-
+    return 0;*/
 }
 
 void client_create_block(file_t *file) {
@@ -89,6 +118,7 @@ void client_create_block(file_t *file) {
     fprintf(stderr, "New num_blocks: %d\n", file->recipe->num_blocks);
 }
 
+// TODO: deal with cache hit ...
 ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int *cache_hit) {
     file_t *file = &(files[filedes]);
     const void* current_pos = buf;

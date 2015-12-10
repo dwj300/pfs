@@ -16,3 +16,4 @@
 server_t *servers;
 dictionary_t files;
 int current_block_id;
+int current_server_id;
