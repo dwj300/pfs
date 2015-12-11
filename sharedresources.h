@@ -21,6 +21,7 @@ typedef int32_t global_server_id_t;
 typedef struct token {
     int start_block;
     int end_block;
+    int client_id;
 } token_t;
 
 typedef struct token_node {
@@ -45,6 +46,8 @@ typedef struct file {
     recipe_t* recipe;
     token_node_t* read_tokens;
     token_node_t* write_tokens;
+    int last_write; // TODO: actually set this
+    int last_read;  // TODO: actually set this
     bool is_writing; // TODO: this needs to go, I just have it to test if sending tokens works
 } file_t;
 
@@ -52,8 +55,6 @@ typedef struct server {
     char hostname[255];
     int port;
 } server_t;
-
-
 
 int connect_socket(char *host, int port);
 server_t* get_server(int server_id);

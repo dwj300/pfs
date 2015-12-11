@@ -146,13 +146,6 @@ bool removeBlockMapping(activity_table_t* hostTable, block_list_node_t* toRemove
     return false;
 }
 
-// TODO: can we delete this???
-block_t* GetBlock(cache_t* cache, global_block_id_t targetBlock) {
-    fprintf(stderr, "ERROR: Not implemented yet.\n");
-    exit(1);
-    return NULL;
-}
-
 bool UnlockBlock(cache_t* cache, global_block_id_t targetBlock) {
     block_list_node_t* hostingNode = findBlockNodeInAccessQueue(cache->ActivityTable, targetBlock);
     if(!hostingNode) {
@@ -537,7 +530,7 @@ void* HarvesterThread(void *cache) {
 // TODO:
 void SpawnHarvester(cache_t* cache) {
     //pthread_t* hostThread = (pthread_t*)malloc(sizeof(pthread_t));
-    pthread_create(&threads[1], NULL, HarvesterThread, (void*)cache);
+    pthread_create(&threads[1], NULL, &HarvesterThread, (void*)cache);
     //pthread_join(*hostThread, malloc(4));
     //fprintf(stderr, "Done harvesting. \n");
 }
@@ -558,7 +551,7 @@ void* FlusherThread(void* cache) {
 void SpawnFlusher(cache_t* cache) {
     fprintf(stderr, "Spawning Flusher Thread\n");
     //pthread_t* hostThread = (pthread_t*)malloc(sizeof(pthread_t));
-    pthread_create(&threads[0], NULL, FlusherThread, (void*)cache); //FlushDirtyBlocks, (void*)cache); //int flusher = ?
+    pthread_create(&threads[0], NULL, &FlusherThread, (void*)cache); //FlushDirtyBlocks, (void*)cache); //int flusher = ?
     //pthread_join(*hostThread, malloc(4)); // We don't wanna block on this...
     //fprintf(stderr, "Done flushing. \n");
 }

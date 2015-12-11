@@ -33,7 +33,6 @@ pthread_t threads[2];
 //Cache access methods
 
 cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWaterMarkPercent, float lowWaterMarkPercent);
-//block_t* GetBlock(cache_t* cache, global_block_id_t targetBlock);
 //bool ReleaseBlock(global_block_id_t targetBlock);
 //bool MarkBlockDirty(cache_t *cache, global_block_id_t targetBlock);
 //bool BlockIsDirty(cache_t *cache, global_block_id_t targetBlock); ??

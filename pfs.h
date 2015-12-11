@@ -26,3 +26,8 @@ cache_t *cache;
 int current_fd;
 char *grapevine_host;
 int grapevine_port;
+char hostname[1024];
+int my_port;
+int client_id;
+
+pthread_t revoker_thread;

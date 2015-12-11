@@ -15,6 +15,8 @@
 #include "time.h"
 
 server_t *servers;
+server_t *clients;
 dictionary_t files;
 int current_block_id;
 int current_server_id;
+int current_cid;

@@ -60,8 +60,8 @@ void get_read_token(int socket_fd, char* filename, int block_index) {
         else {
             // some really complicated logic
             // TODO
-            fprintf(stderr, "ERROR: Not implemented yet\n");
-            exit(1);         
+            //fprintf(stderr, "ERROR: Not implemented yet\n");
+            //exit(1);         
         }
     }
 }
@@ -69,6 +69,7 @@ void get_read_token(int socket_fd, char* filename, int block_index) {
 void get_write_token(int socket_fd, char* filename, int block_index) {
     // this is complicated. psuedocode for now
     // TODO
+
     entry_t* e = lookup(files, filename);
 
     if (e == NULL) {
@@ -82,15 +83,15 @@ void get_write_token(int socket_fd, char* filename, int block_index) {
     }
     else {
         fprintf(stderr, "ERROR: Not implemented yet\n");
-        exit(1); 
+        //exit(1); 
         // some really complicated logic
         // TODO
-        // file_t* file = e->value;
-        /*token_t* token = malloc(sizeof(token_t));
+        file_t* file = e->value;
+        token_t* token = malloc(sizeof(token_t));
         token->start_block = 0;
         token->end_block = file->recipe->num_blocks - 1;
         write(socket_fd, token, sizeof(token_t));
-        close(socket_fd);*/
+        close(socket_fd);
     }
 }
 
@@ -147,9 +148,13 @@ int fstat(char *filename) {
     return 0;
 }
 
-void get_servers(int socket_fd) {
+void get_servers_gv(int socket_fd, char* hostname, int port) {
+    strcpy(clients[current_cid].hostname, hostname);
+    clients[current_cid].port = port;
+    write(socket_fd, &current_cid, sizeof(int));
     write(socket_fd, servers, NUM_FILE_SERVERS * sizeof(server_t));
     close(socket_fd);
+    current_cid += 1;
 }
 
 int create_block_gv(int socket_fd, char *filename) {
@@ -227,6 +232,8 @@ void initialize() {
     strcpy(servers[1].hostname, "localhost");
     servers[1].port = 8082;
     current_server_id = 0;
+    clients = calloc(MAX_CLIENTS, sizeof(server_t));
+    current_cid = 0;
 }
 
 int main(int argc, char* argv[]) {
@@ -300,7 +307,10 @@ int main(int argc, char* argv[]) {
             delete_file(newsockfd, filename);
         }
         else if (strcmp(opcode, "SERVERS") == 0) {
-            get_servers(newsockfd);
+            char* hostname = (char*)data1;
+            char* port_str = (char*)data2;
+            int port = atoi(port_str);
+            get_servers_gv(newsockfd, hostname, port);
         }
         else if (strcmp(opcode, "OPEN") == 0) {
             char* filename = (char*)data1;

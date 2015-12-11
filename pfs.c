@@ -28,7 +28,7 @@ void add_token(file_t* file, token_t* token, bool read) {
     node->next = NULL;
     //variable = condition ? value_if_true : value_if_false
     token_node_t* cur = (read == true) ? file->read_tokens : file->write_tokens;
-    
+
     while(cur != NULL && cur->next != NULL) {
         cur = cur->next;
     }
@@ -37,7 +37,7 @@ void add_token(file_t* file, token_t* token, bool read) {
             file->read_tokens = node;
         }
         else {
-            file->write_tokens = node;   
+            file->write_tokens = node;
         }
     }
     else {
@@ -219,7 +219,7 @@ ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int 
         bytes_written += (end_position - current_offset);
         current_offset = 0;
     }
-    
+
     // TODO: change cache write to be a constant void * to match API.
     //int gid = file->recipe->blocks[block_id].block_id; // TODO: change api to be offset and size
     //WriteToBlockAndMarkDirty(cache, gid, buf, offset_within_block, offset_within_block+nbyte, file->recipe->blocks[block_id].server_id); // TODO: also pass server????
@@ -230,7 +230,7 @@ ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int 
 
 int pfs_close(int filedes) {
     // TODO: something with tokens
-    // flush any blocks in the cache to server. 
+    // flush any blocks in the cache to server.
     file_t* file = &(files[filedes]);
     fprintf(stderr, "closing file: %s\n", file->filename);
     for(int i = 0; i < file->recipe->num_blocks; i++) {
@@ -266,9 +266,12 @@ int pfs_fstat(int filedes, struct pfs_stat *buf) { // Check the config file for 
 server_t* get_servers() {
     int socket_fd = connect_socket(grapevine_host, grapevine_port);
     servers = malloc(NUM_FILE_SERVERS * sizeof(server_t));
-    char* command = "SERVERS";
+    char* command = malloc(275 * sizeof(char));//"SERVERS";
+    sprintf(command, "SERVERS %s %d", hostname, my_port);
     int length = strlen(command);
     write(socket_fd, command, length+1);
+    read(socket_fd, &client_id, sizeof(int));
+    fprintf(stderr, "my client id: %d\n", client_id);
     read(socket_fd, servers, NUM_FILE_SERVERS * sizeof(server_t));
     close(socket_fd);
     return servers;
@@ -280,21 +283,150 @@ void print_servers() {
     }
 }
 
-//void print_rec
+// REVOKE FILENAME INDEX
+int parse_args(char* buffer, char** opcode, void** data1, void** data2) {
+    char* space = strchr(buffer, ' ');
+    *opcode = malloc(sizeof(char) * 10);
+    if (space == NULL) {
+        (*opcode) = buffer;
+    }
+    else{
+        char *end = stpncpy(*opcode, buffer, (space - buffer));
+        (*end) = '\0';
+        space += sizeof(char);
+        char* next_space = strchr(space, ' ');
+        if (next_space != NULL) {
+            (*data1) = malloc(255 * sizeof(char));
+            strncpy(*data1, space, (next_space-space));
+            (*data2) = (next_space + sizeof(char));
+        }
+        else {
+            (*data1) = space;
+        }
+    }
+    fprintf(stderr, "pcode:%sd\n", (*opcode));
+    return 0;
+}
+
+void revoke_token(int socket_fd, char* filename, int index) {
+    file_t *file = NULL;
+    for (int i = 0; i < MAX_FILES; i++) {
+        if (strcmp(files[i].filename, filename) == 0) {
+            file = &(files[i]);
+            break;
+        }
+    }
+    //token_node_t *prev = NULL;
+    token_node_t *cur = file->write_tokens;
+    while(cur != NULL && cur->next != NULL) {
+        if (cur->token->start_block <= index && index <= cur->token->end_block) {
+            // found our token...
+            // by checking strictly > we can't have out of bounds
+            if (index > file->last_write) {
+                cur->token->end_block = index-1;
+            }
+            else if (index < file->last_write) {
+                cur->token->start_block = file->last_write + 1;
+                // TODO: check for out of bounds
+            }
+            else {
+                fprintf(stderr, "[ERROR]: Some very strange case just happened...\n");
+                exit(1);
+            }
+            // Send back the new token:
+            write(socket_fd, cur->token, sizeof(token_t));
+            break;
+        }
+        cur = cur->next;
+    }
+
+    // TODO: Also deal with read tokens? I kind of think we should pass in the request which one the client should be revoking
+    if (cur == NULL) {
+        fprintf(stderr, "[ERROR]: We didn't actually revoke a token... so deal with it\n");
+        exit(1);
+    }
+}
+
+void* revoker(void* arg) {
+    fprintf(stderr, "Starting revoker on port: %d\n", my_port);
+    int sockfd, newsockfd, n;
+    socklen_t clilen;
+    char buffer[512];
+    struct sockaddr_in serv_addr, cli_addr;
+
+    sockfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (sockfd < 0) {
+        fprintf(stderr, "ERROR opening revoker socket\n");
+        exit(1);
+    }
+    bzero((char *) &serv_addr, sizeof(serv_addr));
+    serv_addr.sin_family = AF_INET;
+    serv_addr.sin_addr.s_addr = INADDR_ANY;
+    serv_addr.sin_port = htons(my_port);
+    if (bind(sockfd, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0) {
+        fprintf(stderr, "ERROR on binding\n");
+        exit(1);
+    }
+
+    listen(sockfd,5);
+    clilen = sizeof(cli_addr);
+
+    while(1) {
+        newsockfd = accept(sockfd, (struct sockaddr *) &cli_addr, &clilen);
+        if (newsockfd < 0) {
+          fprintf(stderr, "ERROR on accept\n");
+          exit(1);
+        }
+
+        bzero(buffer,512);
+        n = read(newsockfd,buffer,512);
+        if (n < 0) {
+            fprintf(stderr, "ERROR reading from socket");
+            exit(1);
+        }
+        // REVOKE FILENAME INDEX
+        char *opcode = NULL;
+        void *data1 = malloc(256 * sizeof(char));
+        void *data2 = malloc(20 * sizeof(char));
+
+        if (parse_args(buffer, &opcode, &data1, &data2) < 0) {
+            fprintf(stderr, "error parsing revoke request\n");
+            exit(1);
+        }
+
+        if (strcmp(opcode, "REVOKE") == 0) {
+            char *filename = (char*)data1;
+            char *index_str = (char*)data2;
+            int index = atoi(index_str);
+            revoke_token(newsockfd, filename, index);
+        }
+        else {
+            fprintf(stderr, "incorrect opcode");
+        }
+    }
+    return NULL;
+}
 
 void initialize(int argc, char **argv) {
-    if (argc < 3) {
+    if (argc < 4) {
         fprintf(stderr, "usage: %s [hostname] [port]\n", argv[0]);
         exit(1);
     }
+
+    hostname[1023] = '\0';
+    gethostname(hostname, 1023);
+    fprintf(stderr, "my hostname: %s\n", hostname);
+
     grapevine_host = argv[1]; //"localhost";
     grapevine_port = atoi(argv[2]); //9875;
+    my_port = atoi(argv[3]); //9875;
     servers = get_servers();
     print_servers();
     current_fd = 0;
     cache = InitializeCache(PFS_BLOCK_SIZE * 1024, 2048, 80, 20);
+    pthread_create(&revoker_thread, NULL, revoker, NULL);
 }
 
 void cleanup() {
-    cache->exiting = true; // TODO: probably not needed 
+    cache->exiting = true; // TODO: probably not needed
 }
