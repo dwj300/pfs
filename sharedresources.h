@@ -48,7 +48,6 @@ typedef struct file {
     token_node_t* write_tokens;
     int last_write; // TODO: actually set this
     int last_read;  // TODO: actually set this
-    bool is_writing; // TODO: this needs to go, I just have it to test if sending tokens works
 } file_t;
 
 typedef struct server {

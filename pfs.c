@@ -7,6 +7,7 @@ bool check_read_token(file_t* file, int block_index) {
         if ((token->start_block <= block_index) && (block_index <= token->end_block)) {
             return true;
         }
+        cur = cur->next;
     }
     return false;
 }
@@ -18,6 +19,7 @@ bool check_write_token(file_t* file, int block_index) {
         if ((token->start_block <= block_index) && (block_index <= token->end_block)) {
             return true;
         }
+        cur = cur->next;
     }
     return false;
 }
@@ -52,7 +54,7 @@ bool get_read_token(file_t* file, int block_index) {
         exit(1);
     }
     char* command = malloc(269*sizeof(char));
-    sprintf(command, "READ_TOKEN %s %d", file->filename, block_index);
+    sprintf(command, "READ_TOKEN %s %d %d", file->filename, block_index, client_id);
     fprintf(stderr, "COMMAND:%sdone\n", command);
     int length = strlen(command);
     write(socket_fd, command, length+1);
@@ -71,7 +73,7 @@ bool get_write_token(file_t* file, int block_index) {
         exit(1);
     }
     char* command = malloc(269*sizeof(char));
-    sprintf(command, "WRITE_TOKEN %s %d", file->filename, block_index);
+    sprintf(command, "WRITE_TOKEN %s %d %d", file->filename, block_index, client_id);
     fprintf(stderr, "COMMAND:%sdone\n", command);
     int length = strlen(command);
     write(socket_fd, command, length+1);
@@ -203,10 +205,13 @@ ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int 
             fprintf(stderr, "new block id: %d\n", file->recipe->blocks[i].block_id);
             fprintf(stderr, "BLOCK_ID: %d\n", files[filedes].recipe->blocks[i].block_id);
         }
-
+        fprintf(stderr, "we have a problem0\n");
         if(!check_write_token(file, i)) {
+            fprintf(stderr, "we have a problem1\n");
             get_write_token(file, i);
+            fprintf(stderr, "we have a problem2\n");
         }
+        fprintf(stderr, "we have a problem3\n");
 
         int end_position = current_offset + (nbyte - bytes_written);
         if (end_position > 1024) {
@@ -229,13 +234,22 @@ ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int 
 }
 
 int pfs_close(int filedes) {
-    // TODO: something with tokens
+    // Tell the grapevine to release all out our tokens
+    file_t *file = &(files[filedes]);
+
+    int socket_fd = connect_socket(grapevine_host, grapevine_port);
+    char* command = malloc(269*sizeof(char));
+    sprintf(command, "CLOSE %s %d", file->filename, client_id);
+    fprintf(stderr, "COMMAND:%s\n", command);
+    int length = strlen(command);
+    write(socket_fd, command, length+1);
+    close(socket_fd);
     // flush any blocks in the cache to server.
-    file_t* file = &(files[filedes]);
     fprintf(stderr, "closing file: %s\n", file->filename);
     for(int i = 0; i < file->recipe->num_blocks; i++) {
         FlushBlockToServer(cache, file->recipe->blocks[i].block_id);
     }
+    // TODO: Free the parts of a file. Maybe we should use a linked list instead of an array to keep track of files on the client.......
     return 1;
 }
 
@@ -308,7 +322,7 @@ int parse_args(char* buffer, char** opcode, void** data1, void** data2) {
     return 0;
 }
 
-void revoke_token(int socket_fd, char* filename, int index) {
+void revoke_token(int socket_fd, char* filename, int index, char token_type) {
     file_t *file = NULL;
     for (int i = 0; i < MAX_FILES; i++) {
         if (strcmp(files[i].filename, filename) == 0) {
@@ -393,12 +407,15 @@ void* revoker(void* arg) {
             fprintf(stderr, "error parsing revoke request\n");
             exit(1);
         }
-
+        // REVOKE [filename] [index] [R/W]
         if (strcmp(opcode, "REVOKE") == 0) {
             char *filename = (char*)data1;
             char *index_str = (char*)data2;
+            char *space = strchr(index_str, ' ');
+            *space = '\0';
+            char *token_type = space + sizeof(char);
             int index = atoi(index_str);
-            revoke_token(newsockfd, filename, index);
+            revoke_token(newsockfd, filename, index, *token_type);
         }
         else {
             fprintf(stderr, "incorrect opcode");
