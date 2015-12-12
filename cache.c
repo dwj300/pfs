@@ -14,8 +14,7 @@ bool CacheIsTooVacant(cache_t* cache) {
 bool pushBlockToServer(block_t* toPush) {
     fprintf(stderr, "Pushing block to server\n");
     server_t* server = get_server(toPush->host);
-    write_block(server->hostname, server->port, toPush->id, toPush->data);
-    
+    write_block(server->hostname, server->port, toPush->id, toPush->data); ///Might want to catch error from this for retrys? i.e. don't mark clean if write-back fails
     toPush->dirty = false;
     //Check if block is the last in the file -> update stat
     return true; //for debugging
@@ -277,6 +276,7 @@ bool ReleaseBlockToCache(cache_t* cache, global_block_id_t blockToRelease) {
     pthread_mutex_lock(toRelease->lock);
     if( (hostingNode->block->dirty) ) {
         if( !pushBlockToServer(hostingNode->block) ) {
+            pthread_mutex_unlock(toRelease->lock);
             return false;
         }
         else{
@@ -337,19 +337,19 @@ bool ReadBlockFromCache(cache_t* cache, global_block_id_t targetBlock, bool* pre
 
 bool FetchBlockFromServer(cache_t* cache, global_block_id_t idOfBlockToFetch, int server_id) {
     block_t* block = ReserveBlockInCache(cache, idOfBlockToFetch);
-    // todo: make atomic
+
+    pthread_mutex_lock(block->lock);
     block->host = server_id;
     block->dirty = false;
 
     server_t* server = get_server(server_id);
     int success = read_block(server->hostname, server->port, idOfBlockToFetch, &(block->data));
     if (!success) {
+        pthread_mutex_unlock(block->lock);
         return false;
     }
 
-    fprintf(stderr, "going to server to get block id: %d\n", idOfBlockToFetch);
-    // exit(1);
-    //Lookup in the recipe which server has the block
+    pthread_mutex_unlock(block->lock);
     return true;
 }
 
@@ -395,31 +395,6 @@ bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, con
     return true;
 }
 
-/*
-uint32_t findWidthUnsigned(uint32_t input) {
-    uint32_t width = 1;
-    while(input/10 > 0) {
-        width++;
-        input/=10;
-    }
-    return width;
-}
-*/
-/*
-char* itoaWrapUn(uint32_t input) {
-    char* buf = (char*)malloc( sizeof(char)* (1+findWidthUnsigned(input)));
-    sprintf(buf, "%u", input);
-    // ultoa(buf, input);
-    return buf;
-}*/
-
-/*
-void printUInt(uint32_t input) {
-    char* toPrint = itoaWrapUn(input);
-    fprintf(stderr, "%s", toPrint);
-    free(toPrint);
-}*/
-
 void CacheReport(cache_t* cache) {
     fprintf(stderr, "Used blocks: \n");
     uint32_t i = 0;
@@ -436,7 +411,7 @@ void CacheReport(cache_t* cache) {
         }
     }
     //fprintf(stderr, "\n");
-    
+
     fprintf(stderr, "%u total active blocks\n", used);
 
     if(used != cache->Occupancy)
@@ -464,7 +439,7 @@ void CacheReport(cache_t* cache) {
     }
 }
 
-// TODO:
+// TODO: ?
 void FlushDirtyBlocks(cache_t* hostCache) {
     fprintf(stderr, "Starting flushing. \n");
     int flushed = 0;
@@ -502,13 +477,11 @@ void FlushDirtyBlocks(cache_t* hostCache) {
         currentTarget = popIDFromIDList( &(hostCache->DirtyList) );
         pthread_mutex_unlock(hostCache->DirtyListLock);
     }
-    //printUInt(flushed);
     fprintf(stderr, "%d blocks flushed.\n", flushed);
 }
 
 // TODO:
 void Harvest(cache_t* cache) {
-    fprintf(stderr, "Done harvesting. \n");
     int harvested = 0;
 
     while(CacheIsTooCrowded(cache)) {
@@ -516,7 +489,6 @@ void Harvest(cache_t* cache) {
             harvested += 1;
         }
     }
-    //printUInt(harvested);
     fprintf(stderr, "%d blocks harvested.\n", harvested);
     //pthread_exit(0);
 }
@@ -556,21 +528,16 @@ void SpawnFlusher(cache_t* cache) {
     //fprintf(stderr, "Done flushing. \n");
 }
 
-// public method
 void FlushBlockToServer(cache_t* cache, global_block_id_t id) {
-    // check if block is dirty
-    // get block
     block_list_node_t* node = findBlockNodeInAccessQueue(cache->ActivityTable, id);
-    if(node && node->block->dirty) {
-        pushBlockToServer(node->block);
-        node->block->dirty = false; // ??? not sure...
+    if(node){
+        pthread_mutex_lock(node);
+        if(node->block->dirty) {
+            ///If we could meaningfully check success here we could retry in a loop
+            pushBlockToServer(node->block);
+        }
+        pthread_mutex_unlock(node);
     }
-    // maybe lock of something???
-    // maybe deal with tokens???
-    // TODO: not sure this is right
-    
-    // unlock it or something?
-
 }
 
 cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWaterMarkPercent, float lowWaterMarkPercent) {
@@ -597,7 +564,6 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
 
     newCache->ActivityTable = initializeActivityTable(newCache->ManagedMemory, blockCount, blockSize);
     SpawnFlusher(newCache);
-    // SpawnHarvester(newCache);
     return newCache;
 }
 
