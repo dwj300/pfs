@@ -43,4 +43,4 @@ void test_cache(int argc, char* argv[]);
 bool ReadBlockFromCache(cache_t* cache, global_block_id_t global_block_id, bool* present, off_t offset, ssize_t nbyte, int server_id, byte** buffer);
 bool WriteToBlockAndMarkDirty(cache_t* cache, global_block_id_t targetBlock, const byte* toCopy, uint32_t startOffset, uint32_t endPosition, int server_id, int* present);
 //bool UnlockBlock(cache_t* cache, global_block_id_t targetBlock); delete???
-bool FlushBlockToServer(cache_t* cache, global_block_id_t id);
+bool FlushBlockToServer(cache_t* cache, global_block_id_t id, bool close);

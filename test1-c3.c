@@ -1,5 +1,3 @@
-#define _XOPEN_SOURCE 500
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -21,56 +19,54 @@
 
 int main(int argc, char *argv[])
 {
-    int ifdes, fdes;
-    int err_value;
-    char* input_fname = "tocopy.txt"; //[20];
-    char *buf;
-    // ssize_t nread;
-    struct pfs_stat mystat;
-    int cache_hit;
+  int ifdes, fdes;
+  int err_value;
+  char *input_fname = "tocopy.txt"; //[20];
+  char *buf;
+  ssize_t nread;
+  struct pfs_stat mystat;
+  int cache_hit;
 
-    // Initialize the client
-    initialize(argc, argv);
-
-    // the command line arguments include an input filename
-    /*if (argc < 2)
+  // Initialize the client
+  initialize(argc, argv);
+  
+  // the command line arguments include an input filename
+  /*if (argc < 2)
     {
-        printf("usage: a.out <input filename>\n");
-        exit(0);
+      printf("usage: a.out <input filename>\n");
+      exit(0);
     }
-    strcpy(input_fname, argv[1]);*/
-    ifdes = open(input_fname, O_RDONLY);
-    buf = (char *)malloc(4*ONEKB);
-    //nread = pread(ifdes, (void *)buf, 3*ONEKB,8*ONEKB);
-    pread(ifdes, (void *)buf, 3*ONEKB,8*ONEKB);
+  strcpy(input_fname, argv[1]);*/
+  ifdes = open(input_fname, O_RDONLY);
+  buf = (char *)malloc(4*ONEKB);
+  nread = pread(ifdes, (void *)buf, 3*ONEKB,8*ONEKB);
 
-    // All the clients open the pfs file
-    fdes = pfs_open("pfs_file1", 'w');
-    if(fdes < 0)
+  // All the clients open the pfs file 
+  fdes = pfs_open("pfs_file1", 'w');
+  if(fdes < 0)
     {
-        printf("Error opening file\n");
-        exit(0);
+      printf("Error opening file\n");
+      exit(0);
     }
 
-    //At client 3: print the file metadata
-    pfs_fstat(fdes, &mystat);
-    printf("File Metadata:\n");
-    printf("Time of creation: %s\n", ctime(&(mystat.pst_ctime)));
-    printf("Time of last modification: %s\n", ctime(&(mystat.pst_mtime)));
-    printf("File Size: %jd\n", (intmax_t)mystat.pst_size);
+  //At client 3: print the file metadata
+  pfs_fstat(fdes, &mystat);
+  printf("File Metadata:\n");
+  printf("Time of creation: %s\n", ctime(&(mystat.pst_ctime)));
+  printf("Time of last modification: %s\n", ctime(&(mystat.pst_mtime)));
+  printf("File Size: %d\n", mystat.pst_size);
+  
+  //Write the next 3 kbytes of data from the input file onto pfs_file
+  err_value = pfs_write(fdes, (void *)buf, 3*ONEKB, 8*ONEKB, &cache_hit);
+  printf("Wrote %d bytes to the file\n", err_value);
 
+  err_value = pfs_read(fdes, (void *)buf, 2*ONEKB, ONEKB, &cache_hit);
+  printf("Read %d bytes of data from the file\n", err_value);
+  printf("%s\n",buf);
 
-    //Write the next 3 kbytes of data from the input file onto pfs_file
-    err_value = pfs_write(fdes, (void *)buf, 3*ONEKB, 8*ONEKB, &cache_hit);
-    printf("Wrote %d bytes to the file\n", err_value);
-
-    err_value = pfs_read(fdes, (void *)buf, 2*ONEKB, ONEKB, &cache_hit);
-    printf("Read %d bytes of data from the file\n", err_value);
-    printf("%s\n",buf);
-
-    pfs_close(fdes);
-    pfs_delete("pfs_file1");
-    free(buf);
-    close(ifdes);
-    return 0;
+  pfs_close(fdes);
+  pfs_delete("pfs_file1");
+  free(buf);
+  close(ifdes);
+  return 0;
 }

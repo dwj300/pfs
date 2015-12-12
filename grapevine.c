@@ -439,25 +439,26 @@ int create_block_gv(int socket_fd, char *filename) {
     fprintf(stderr, "1\n");
     fprintf(stderr, "foo2\n");
 
-    int server = (current_server_id % NUM_FILE_SERVERS);
-    current_server_id += 1;
+    //int server = (current_server_id % NUM_FILE_SERVERS);
+    //current_server_id += 1;
 
+    // Round robin
     if (file->current_stripe == STRIP_SIZE - 1) {
         file->current_stripe = 0;
         file->current_server += 1;
         file->current_server = file->current_server % file->stripe_width;
     }
 
-    file->recipe->blocks[file->recipe->num_blocks].server_id = server;
+    file->recipe->blocks[file->recipe->num_blocks].server_id = file->current_server;
     file->current_stripe += 1;
 
-    fprintf(stderr, "assigning server %d\n", server);
+    fprintf(stderr, "assigning server %d\n", file->current_server);
     
     file->recipe->num_blocks += 1;
     printf("numblocks: %d\n", file->recipe->num_blocks);
     fprintf(stderr, "block_id:%d\n", file->recipe->blocks[0].block_id);
     // Create block on server.
-    create_block(servers[server].hostname, servers[server].port, gid);
+    create_block(servers[file->current_server].hostname, servers[file->current_server].port, gid);
     // send back new recipe?
     write(socket_fd, file->recipe, sizeof(recipe_t));
     close(socket_fd);
@@ -503,7 +504,7 @@ void initialize() {
     servers[0].port = 8081;
     strcpy(servers[1].hostname, "localhost");
     servers[1].port = 8082;
-    current_server_id = 0;
+    //current_server_id = 0;
     clients = calloc(MAX_CLIENTS, sizeof(server_t));
     current_cid = 0;
 }

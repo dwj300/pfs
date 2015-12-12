@@ -251,7 +251,7 @@ block_t* ReserveAndLockBlockInCache(cache_t* cache, global_block_id_t blockToRes
         addNodeToHeadOfList(cache->ActivityTable->AccessQueue, freeNode);
         cache->Occupancy++;
         if(CacheIsTooCrowded(cache)) {
-            sem_post(cache->OccupancyMonitor);
+            //sem_post(cache->OccupancyMonitor);
         }
         pthread_mutex_unlock(cache->ActivityTable->lock);
         return freeNode->block;
@@ -464,7 +464,7 @@ void Harvest(cache_t* cache) {
 void* HarvesterThread(void *cache) {
     cache_t* hostCache = (cache_t*)cache;
     while(!hostCache->exiting){
-        sem_wait(hostCache->OccupancyMonitor);
+        //sem_wait(hostCache->OccupancyMonitor);
         Harvest(hostCache);
     }
     return NULL;
@@ -477,9 +477,14 @@ void SpawnHarvester(cache_t* cache) {
 }
 
 //DOESN'T remove the id from the dirty list, since you might supply the id by doing so in the caller via a pop preceding the call to this function
-bool FlushBlockToServer(cache_t* hostCache, global_block_id_t id) {
+bool FlushBlockToServer(cache_t* hostCache, global_block_id_t id, bool close) {
     pthread_mutex_lock(hostCache->ActivityTable->lock);
     block_list_node_t* hostingNode = findBlockNodeInAccessQueue(hostCache->ActivityTable, id);
+
+    if (!hostingNode && close) {
+        pthread_mutex_unlock(hostCache->ActivityTable->lock);
+        return false;
+    }
 
     if(!hostingNode) {
         pthread_mutex_unlock(hostCache->ActivityTable->lock);
@@ -513,7 +518,7 @@ void FlushDirtyBlocks(cache_t* hostCache) {
     pthread_mutex_unlock(hostCache->DirtyListLock);
 
     while(currentTarget != BLOCK_IS_FREE) {
-        if( FlushBlockToServer(hostCache, currentTarget)){
+        if( FlushBlockToServer(hostCache, currentTarget, false)){
             flushed++;
         }
         pthread_mutex_lock(hostCache->DirtyListLock);
@@ -556,15 +561,15 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
     newCache->HighWaterMark = (uint32_t)((highWaterMarkPercent/100)*blockCount);
     newCache->LowWaterMark = (uint32_t)((lowWaterMarkPercent/100)*blockCount);
     newCache->Occupancy = 0;
-    newCache->OccupancyMonitor = (sem_t*)malloc(sizeof(sem_t));
-    sem_init(newCache->OccupancyMonitor, 0, 0);
+    //newCache->OccupancyMonitor = (sem_t*)malloc(sizeof(sem_t));
+    //sem_init(newCache->OccupancyMonitor, 0, 0);
 
     newCache->DirtyList = NULL;
     newCache->DirtyListLock = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
 
     newCache->ActivityTable = initializeActivityTable(newCache->ManagedMemory, blockCount, blockSize);
     SpawnFlusher(newCache);
-    SpawnHarvester(newCache);
+    //SpawnHarvester(newCache);
 
     return newCache;
 }

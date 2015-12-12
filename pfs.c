@@ -251,7 +251,6 @@ ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int 
         bytes_written += (end_position - current_offset);
         current_offset = 0;
         file->last_write = i;
-
     }
 
     // TODO: change cache write to be a constant void * to match API.
@@ -276,7 +275,7 @@ int pfs_close(int filedes) {
     // flush any blocks in the cache to server.
     fprintf(stderr, "closing file: %s\n", file->filename);
     for(int i = 0; i < file->recipe->num_blocks; i++) {
-        FlushBlockToServer(cache, file->recipe->blocks[i].block_id);
+        FlushBlockToServer(cache, file->recipe->blocks[i].block_id, true);
     }
     // TODO: Free the parts of a file. Maybe we should use a linked list instead of an array to keep track of files on the client.......
     return 1;
@@ -471,14 +470,14 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
         if (cur->token->start_block == INVALID_TOKEN) {
             // If token is invalid, flush them all
             for (int i = 0; i < file->recipe->num_blocks; i++) {
-                FlushBlockToServer(cache, file->recipe->blocks[i].block_id);
+                FlushBlockToServer(cache, file->recipe->blocks[i].block_id, true);
             }
         }
         else {
             // Go through all blocks from old list and flush accordingly
             for (int i = old_start; i <= old_end; i++) {
                 if (!(new_start <= i && i <= new_end)) {
-                    FlushBlockToServer(cache, file->recipe->blocks[i].block_id); 
+                    FlushBlockToServer(cache, file->recipe->blocks[i].block_id, true); 
                 }
             }
         }
