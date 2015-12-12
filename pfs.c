@@ -127,8 +127,9 @@ int pfs_open(const char *filename, const char mode) {
     // Connect to grapevine:
     int fd = current_fd;
     current_fd += 1;
-    files[fd].filename = filename;
-    file.mode = mode;
+    file_t *file = (&files[fd]);
+    file->filename = filename;
+    file->mode = mode;
     fprintf(stderr, "h1\n");
 
     int socket_fd = connect_socket(grapevine_host, grapevine_port);
