@@ -215,6 +215,7 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
 ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int *cache_hit) {
     *cache_hit = 1;
     file_t *file = &(files[filedes]);
+    fprintf(stderr, "mode: %c\n", file->mode);
     if (file->mode != 'W') {
         fprintf(stderr, "File was not oppened in write mode.\n");
         return -1;

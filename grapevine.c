@@ -12,13 +12,11 @@ int create_file(int socket_fd, char* filename, int stripe_width) {
         return 0;
     }
     else {
-        if (stripe_width < NUM_FILE_SERVERS) {
-            fprintf(stderr, "Error, too many stripes. Please try again.\n");
-            int success = 0;
-            write(socket_fd, &success, sizeof(int));
-            return -1;
-        }
         file_t* file = malloc(sizeof(file_t));
+        if (stripe_width > NUM_FILE_SERVERS) {
+            fprintf(stderr, "Error, too many stripes. Instead we will use %d servers.\n", NUM_FILE_SERVERS);
+            stripe_width = NUM_FILE_SERVERS;
+        }
         file->filename = filename;
         pfs_stat_t* stat = malloc(sizeof(pfs_stat_t));
         stat->pst_size = 0;
