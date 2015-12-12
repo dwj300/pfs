@@ -334,8 +334,11 @@ int parse_args(char* buffer, char** opcode, void** data1, void** data2) {
 }
 
 void revoke_token(int socket_fd, char* filename, int index, char token_type) {
+    // DONE: Also deal with read tokens? I kind of think we should pass in the request which one the client should be revoking
+
     fprintf(stderr, "start revoke token\n");
     file_t *file = NULL;
+    // have to iterate through files cause we are sent a filename not FD
     for (int i = 0; i < MAX_FILES; i++) {
         if (strcmp(files[i].filename, filename) == 0) {
             file = &(files[i]);
@@ -346,34 +349,67 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
         fprintf(stderr, "file not found\n");
         exit(1);
     }
-    //token_node_t *prev = NULL;
-    token_node_t *cur = file->write_tokens;
-    while(cur != NULL && cur->next != NULL) {
-        int start = cur->token->start_block;
-        int end = (cur->token->end_block == -1) ? file->recipe->num_blocks - 1 : cur->token->end_block;       
 
-        if (start <= index && index <= end) {
-            // found our token...
-            // by checking strictly > we can't have out of bounds
-            if (index > file->last_write) {
-                cur->token->end_block = index-1;
+    token_node_t *cur;
+
+    if (token_type == 'W') {
+        cur = file->write_tokens;
+    
+        while(cur != NULL && cur->next != NULL) {
+            int start = cur->token->start_block;
+            int end = (cur->token->end_block == -1) ? file->recipe->num_blocks - 1 : cur->token->end_block;       
+
+            if (start <= index && index <= end) {
+                // found our token...
+                // by checking strictly > we can't have out of bounds
+                if (index > file->last_write) {
+                    cur->token->end_block = index-1;
+                }
+                else if (index < file->last_write) {
+                    cur->token->start_block = file->last_write + 1;
+                    // TODO: check for out of bounds
+                }
+                else {
+                    fprintf(stderr, "[ERROR]: Some very strange case just happened...\n");
+                    exit(1);
+                }
+                // Send back the new token:
+                write(socket_fd, cur->token, sizeof(token_t));
+                break;
             }
-            else if (index < file->last_write) {
-                cur->token->start_block = file->last_write + 1;
-                // TODO: check for out of bounds
-            }
-            else {
-                fprintf(stderr, "[ERROR]: Some very strange case just happened...\n");
-                exit(1);
-            }
-            // Send back the new token:
-            write(socket_fd, cur->token, sizeof(token_t));
-            break;
+            cur = cur->next;
         }
-        cur = cur->next;
+    }
+    // Deal with read tokens
+    else {
+        cur = file->read_tokens;
+    
+        while(cur != NULL && cur->next != NULL) {
+            int start = cur->token->start_block;
+            int end = (cur->token->end_block == -1) ? file->recipe->num_blocks - 1 : cur->token->end_block;       
+
+            if (start <= index && index <= end) {
+                // found our token...
+                // by checking strictly > we can't have out of bounds
+                if (index > file->last_read) {
+                    cur->token->end_block = index-1;
+                }
+                else if (index < file->last_read) {
+                    cur->token->start_block = file->last_read + 1;
+                    // TODO: check for out of bounds
+                }
+                else {
+                    fprintf(stderr, "[ERROR]: Some very strange case just happened...\n");
+                    exit(1);
+                }
+                // Send back the new token:
+                write(socket_fd, cur->token, sizeof(token_t));
+                break;
+            }
+            cur = cur->next;
+        }
     }
 
-    // TODO: Also deal with read tokens? I kind of think we should pass in the request which one the client should be revoking
     if (cur == NULL) {
         fprintf(stderr, "[ERROR]: We didn't actually revoke a token... so deal with it\n");
         exit(1);

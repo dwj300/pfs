@@ -37,7 +37,6 @@ void revoke_token(char* filename, int index, int client_id, token_t* token, char
     // sends a message to the correct client (lookip via clients table)
     // tell them to revoke
     // write their response at their current token.
-    // TODO:
     fprintf(stderr, "revoking %c token(%d->%d, on client %d\n", token_type, token->start_block, token->end_block, client_id);
     server_t *client = &(clients[client_id]);
     int socket_fd = connect_socket(client->hostname, client->port);
