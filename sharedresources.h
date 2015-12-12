@@ -12,6 +12,8 @@
 #define false 0
 #define BLOCK_IS_FREE -1
 #define MAX_BLOCKS 100
+#define INVALID_TOKEN -1
+#define INFINITE_TOKEN -1
 
 typedef int bool;
 typedef char byte;

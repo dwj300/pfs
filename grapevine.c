@@ -66,7 +66,7 @@ void get_read_token(int socket_fd, char* filename, int index, int client_id) {
     if (e == NULL) {
         fprintf(stderr, "File with name:%s doesn't exists.\n", filename);
         token_t* token = malloc(sizeof(token_t));
-        token->start_block = -1; // indicates invalid
+        token->start_block = INVALID_TOKEN; // indicates invalid
         token->end_block = 0;
         write(socket_fd, token, sizeof(token_t));
         close(socket_fd);
@@ -83,12 +83,12 @@ void get_read_token(int socket_fd, char* filename, int index, int client_id) {
 
             int start = token->start_block;
             int end = token->end_block;
-            if (start == -1) {
+            if (start == INVALID_TOKEN) {
                 // its a dud token.
                 cur = cur->next;
                 continue;
             }
-            if (end == -1) {
+            if (end == INFINITE_TOKEN) {
                 end = file->recipe->num_blocks - 1;
             }
 
@@ -110,7 +110,7 @@ void get_read_token(int socket_fd, char* filename, int index, int client_id) {
                 start = token->start_block;
                 end = token->end_block;
                 // look at the new token
-                if (start == -1) {
+                if (start == INVALID_TOKEN) {
                     // its a dud token.
                     cur = cur->next;
                     continue;
@@ -134,7 +134,7 @@ void get_read_token(int socket_fd, char* filename, int index, int client_id) {
         }
 
         if (temp_e == file->recipe->num_blocks - 1) {
-            temp_e = -1; // -1 indicates infinity...
+            temp_e = INFINITE_TOKEN; // -1 indicates infinity...
         }
 
         token_t* new_token = malloc(sizeof(token_t));
@@ -162,8 +162,8 @@ void get_write_token(int socket_fd, char* filename, int index, int client_id) {
     if (e == NULL) {
         fprintf(stderr, "File with name:%s doesn't exists.\n", filename);
         token_t* token = malloc(sizeof(token_t));
-        token->start_block = -2;
-        token->end_block = -1;
+        token->start_block = INVALID_TOKEN;
+        token->end_block = 0;
         write(socket_fd, token, sizeof(token_t));
         close(socket_fd);
         return;
@@ -181,7 +181,7 @@ void get_write_token(int socket_fd, char* filename, int index, int client_id) {
             // if t before
             int start = token->start_block;
             int end = token->end_block;
-            if (end == -1) {
+            if (end == INFINITE_TOKEN) {
                 end = file->recipe->num_blocks - 1;
             }
 
@@ -233,7 +233,7 @@ void get_write_token(int socket_fd, char* filename, int index, int client_id) {
             
             int start = token->start_block;
             int end = token->end_block;
-            if (end == -1) {
+            if (end == INFINITE_TOKEN) {
                 end = file->recipe->num_blocks - 1;
             }
 
@@ -274,7 +274,7 @@ void get_write_token(int socket_fd, char* filename, int index, int client_id) {
         }
 
         if (temp_e == file->recipe->num_blocks - 1) {
-            temp_e = -1; // -1 indicates infinity...
+            temp_e = INFINITE_TOKEN; // -1 indicates infinity...
         }
         token_t* new_token = malloc(sizeof(token_t));
         token_t* read_token = malloc(sizeof(token_t));
