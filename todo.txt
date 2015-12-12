@@ -38,3 +38,14 @@ possibly move FD to the server...
 probably need to keep track of whose accesing which files....ugh
 
 need to deal with revokation.
+
+
+keep track of partial block size
+
+add command to grapevine to keep track of size...
+
+add who i am to get_servers
+
+keep clients array in grapevine
+
+check if client can read / write a file on client side
