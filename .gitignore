@@ -44,9 +44,14 @@ cache
 dict
 test
 test_cache
-
+test1
+test2
+test3
 # Mac OS X
 .DS_Store
 
 # Swap
 *~
+
+serv1/
+serv2/

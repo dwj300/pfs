@@ -145,7 +145,7 @@ int main(int argc, char *argv[]) {
             delete_block(block_id);   
         }
         else {
-            fprintf(stderr, "incorrect opcode");
+            fprintf(stderr, "incorrect opcode:%sd\n", opcode);
         }
     }
     return 0;

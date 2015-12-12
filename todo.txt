@@ -9,7 +9,7 @@ write delete DONE
 add who i am to get_servers DONE
 keep clients array in grapevine DONE
 add logic to give a read token if you get a write token DONE
-
+Call flusher thread (have an idea for this, actually all of the code for this is written we are just missing one line. DONE
 
 Write report
 
@@ -19,20 +19,16 @@ multi thread read / write (shouldn't be too hard)
 
 
 modification time, and push to server TODO
-
 last read / last write (for token resolution logic) TODO
-
 add ability to get stat after opening... TODO
-
 keep track of partial block size TODO
-
 add command to grapevine to keep track of exact size TODO
-
-
-
-check if client can read / write a file on client side
-
-Call flusher thread (have an idea for this, actually all of the code for this is written we are just missing one line. DONE
+check if client can read / write a file on client side TODO
 Call harvester thread TODO
 deal with stale stat entries TODO
 deal with stripe width / stripe size (on piazza) (not quite) robin server assignment TODO
+actually use CLIENT_CACHE_SIZE
+
+WHY THE FUCK ISNT REVOKE BLOCKING...
+
+make magic numbers #defines

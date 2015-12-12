@@ -552,7 +552,7 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
 
     cache_t* newCache = (cache_t*)malloc(sizeof(cache_t));
     newCache->exiting = 0;
-    newCache->ManagedMemory = (byte*)malloc(blockSize* blockCount);
+    newCache->ManagedMemory = (byte*)calloc(blockCount, blockSize);
 
     newCache->BlockCount = blockCount;
     newCache->BlockSize = blockSize;
