@@ -49,3 +49,5 @@ add who i am to get_servers
 keep clients array in grapevine
 
 check if client can read / write a file on client side
+
+add logic to give a read token if you get a write token..

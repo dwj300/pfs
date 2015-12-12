@@ -38,6 +38,7 @@ void revoke_token(char* filename, int index, int client_id, token_t* token, char
     // tell them to revoke
     // write their response at their current token.
     // TODO:
+    fprintf(stderr, "revoking %c token(%d->%d, on client %d\n", token_type, token->start_block, token->end_block, client_id);
     server_t *client = &(clients[client_id]);
     int socket_fd = connect_socket(client->hostname, client->port);
     if (socket_fd < 0) {
@@ -59,8 +60,8 @@ void get_read_token(int socket_fd, char* filename, int index, int client_id) {
     if (e == NULL) {
         fprintf(stderr, "File with name:%s doesn't exists.\n", filename);
         token_t* token = malloc(sizeof(token_t));
-        token->start_block = -1;
-        token->end_block = -1;
+        token->start_block = -1; // indicates invalid
+        token->end_block = 0;
         write(socket_fd, token, sizeof(token_t));
         close(socket_fd);
         return;
@@ -73,32 +74,51 @@ void get_read_token(int socket_fd, char* filename, int index, int client_id) {
         token_node_t *cur = file->write_tokens;
         while(cur != NULL) {
             token_t* token = cur->token;
+
+            int start = token->start_block;
+            int end = token->end_block;
+            if (end == -1) {
+                end = file->recipe->num_blocks - 1;
+            }
+
             // if t before
-            if (token->end_block < index) {
-                if (token->end_block > temp_s) {
-                    temp_s = token->end_block + 1;
+            if (end < index) {
+                if (end > temp_s) {
+                    temp_s = end + 1;
                 }
             }
             // if t after
-            if (token->end_block > index) {
-                if (token->end_block <= temp_s) {
-                    temp_e = token->start_block - 1;
+            else if (start > index) {
+                if (end <= temp_s) {
+                    temp_e = start - 1;
                 }
             }
-            // if t overlap
-            revoke_token(filename, index, token->client_id, token, 'W');
-            // look at the new token
-            if (token->start_block > index) {
-                temp_e = token->start_block - 1;
-            }
-            else if (token->end_block < index) {
-                temp_s = token->end_block + 1;    
+            else if (start <= index && end >= index) {
+                // if t overlap
+                revoke_token(filename, index, token->client_id, token, 'W');
+                start = token->start_block;
+                end = token->end_block;
+                // look at the new token
+                if (start > index) {
+                    temp_e = start - 1;
+                }
+                else if (end < index) {
+                    temp_s = end + 1;    
+                }
+                else {
+                    fprintf(stderr, "ERROR: client sent back a bad token. Dying.\n");
+                    exit(1);
+                }
             }
             else {
                 fprintf(stderr, "ERROR: client sent back a bad token. Dying.\n");
                 exit(1);
             }
             cur = cur->next;
+        }
+
+        if (temp_e == file->recipe->num_blocks - 1) {
+            temp_e = -1; // -1 indicates infinity...
         }
 
         token_t* new_token = malloc(sizeof(token_t));
@@ -140,28 +160,48 @@ void get_write_token(int socket_fd, char* filename, int index, int client_id) {
         while(cur != NULL) {
             token_t* token = cur->token;
             // if t before
-            if (token->end_block < index) {
-                if (token->end_block > temp_s) {
-                    temp_s = token->end_block + 1;
+            int start = token->start_block;
+            int end = token->end_block;
+            if (end == -1) {
+                end = file->recipe->num_blocks - 1;
+            }
+
+            if (end < index) {
+                if (end > temp_s) {
+                    temp_s = end + 1;
+                    if(temp_s > file->recipe->num_blocks - 1) { 
+                        temp_s = file->recipe->num_blocks - 1;
+                    }
                 }
             }
             // if t after
-            if (token->end_block > index) {
-                if (token->end_block <= temp_s) {
-                    temp_e = token->start_block - 1;
+            else if (start > index) {
+                if (end <= temp_s) {
+                    temp_e = start - 1;
+                    if (temp_e < 0) {
+                        temp_e = 0;
+                    }
                 }
             }
-            // if t overlap
-            revoke_token(filename, index, token->client_id, token, 'W');
-            // look at the new token
-            if (token->start_block > index) {
-                temp_e = token->start_block - 1;
-            }
-            else if (token->end_block < index) {
-                temp_s = token->end_block + 1;    
+            else if (start <= index && end >=index) {
+                // if t overlap
+                revoke_token(filename, index, token->client_id, token, 'W');
+                // look at the new token
+                start = token->start_block;
+                end = token->end_block;
+                if (start > index) {
+                    temp_e = start - 1;
+                }
+                else if (end < index) {
+                    temp_s = end + 1;    
+                }
+                else {
+                    fprintf(stderr, "ERROR: client sent back a bad token. Dying.\n");
+                    exit(1);
+                }
             }
             else {
-                fprintf(stderr, "ERROR: client sent back a bad token. Dying.\n");
+                fprintf(stderr, "some other type of token found\n");
                 exit(1);
             }
             cur = cur->next;
@@ -171,43 +211,74 @@ void get_write_token(int socket_fd, char* filename, int index, int client_id) {
         cur = file->read_tokens;
         while(cur != NULL) {
             token_t* token = cur->token;
+            
+            int start = token->start_block;
+            int end = token->end_block;
+            if (end == -1) {
+                end = file->recipe->num_blocks - 1;
+            }
+
             // if t before
-            if (token->end_block < index) {
-                if (token->end_block > temp_s) {
-                    temp_s = token->end_block + 1;
+            if (end < index) {
+                if (end > temp_s) {
+                    temp_s = end + 1;
                 }
             }
             // if t after
-            if (token->end_block > index) {
-                if (token->end_block <= temp_s) {
-                    temp_e = token->start_block - 1;
+            else if (end > index) {
+                if (end <= temp_s) {
+                    temp_e = start - 1;
                 }
             }
-            // if t overlap
-            revoke_token(filename, index, token->client_id, token, 'R');
-            // look at the new token
-            if (token->start_block > index) {
-                temp_e = token->start_block - 1;
-            }
-            else if (token->end_block < index) {
-                temp_s = token->end_block + 1;    
+            else if (start <= index && end >=index) {
+                // if t overlap
+                revoke_token(filename, index, token->client_id, token, 'R');
+                start = token->start_block;
+                end = token->end_block;
+                // look at the new token
+                if (start > index) {
+                    temp_e = start - 1;
+                }
+                else if (end < index) {
+                    temp_s = end + 1;    
+                }
+                else {
+                    fprintf(stderr, "ERROR: client sent back a bad token. Dying.\n");
+                    exit(1);
+                }
             }
             else {
-                fprintf(stderr, "ERROR: client sent back a bad token. Dying.\n");
+                fprintf(stderr, "token is invalid.\n");
                 exit(1);
             }
             cur = cur->next;
         }
 
+        if (temp_e == file->recipe->num_blocks - 1) {
+            temp_e = -1; // -1 indicates infinity...
+        }
         token_t* new_token = malloc(sizeof(token_t));
+        token_t* read_token = malloc(sizeof(token_t));
+
         new_token->start_block = temp_s;
         new_token->end_block = temp_e;
         new_token->client_id = client_id;
+
+        read_token->start_block = temp_s;
+        read_token->end_block = temp_e;
+        read_token->client_id = client_id;
+
+        // Add to head of write token linked list
         token_node_t* node = malloc(sizeof(token_node_t));
         node->token = new_token;
-        // Add to head of linked list
         node->next = file->write_tokens;
         file->write_tokens = node;
+        // Add to head of read token linked list
+        token_node_t* read_node = malloc(sizeof(token_node_t));
+        read_node->token = read_token;
+        read_node->next = file->read_tokens;
+        file->read_tokens = read_node;
+
         write(socket_fd, new_token, sizeof(token_t));
         close(socket_fd);
         fprintf(stderr, "now we're here\n");
@@ -233,6 +304,23 @@ void close_file(char* filename, int client_id) {
                 prev->next = cur->next;
             }
             
+        }
+        else {
+        }
+        prev = cur;
+        cur = cur->next;
+    }
+    // Do the same for any read tokens open
+    prev = NULL;
+    cur = file->read_tokens;
+    while(cur != NULL) {
+        if (cur->token->client_id == client_id) {
+            if (prev == NULL) {
+                file->read_tokens = cur->next;
+            }
+            else {
+                prev->next = cur->next;
+            }
         }
         else {
         }
@@ -295,6 +383,7 @@ int fstat(char *filename) {
 }
 
 void get_servers_gv(int socket_fd, char* hostname, int port) {
+    fprintf(stderr, "new client id:%d, %s:%d\n", current_cid, hostname, port);
     strcpy(clients[current_cid].hostname, hostname);
     clients[current_cid].port = port;
     write(socket_fd, &current_cid, sizeof(int));

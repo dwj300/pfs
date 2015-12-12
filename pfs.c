@@ -4,7 +4,9 @@ bool check_read_token(file_t* file, int block_index) {
     token_node_t* cur = file->read_tokens;
     while(cur != NULL) {
         token_t* token = cur->token;
-        if ((token->start_block <= block_index) && (block_index <= token->end_block)) {
+        int start = token->start_block;
+        int end = (token->end_block == -1) ? file->recipe->num_blocks - 1 : token->end_block;       
+        if ((start <= block_index) && (block_index <= end)) {
             return true;
         }
         cur = cur->next;
@@ -14,9 +16,12 @@ bool check_read_token(file_t* file, int block_index) {
 
 bool check_write_token(file_t* file, int block_index) {
     token_node_t* cur = file->write_tokens;
+
     while(cur != NULL) {
         token_t* token = cur->token;
-        if ((token->start_block <= block_index) && (block_index <= token->end_block)) {
+        int start = token->start_block;
+        int end = (token->end_block == -1) ? file->recipe->num_blocks - 1 : token->end_block;       
+        if ((start <= block_index) && (block_index <= end)) {
             return true;
         }
         cur = cur->next;
@@ -81,6 +86,12 @@ bool get_write_token(file_t* file, int block_index) {
     read(socket_fd, token, sizeof(token_t));
     fprintf(stderr, "New write token: %d->%d\n", token->start_block, token->end_block);
     add_token(file, token, false);
+    // lets also create a read token
+    token_t* read_token = malloc(sizeof(token_t));
+    read_token->start_block = token->start_block;
+    read_token->end_block = token->end_block;
+    read_token->client_id = token->client_id;
+    add_token(file, read_token, true);
     close(socket_fd);
     return true;
 }
@@ -318,11 +329,12 @@ int parse_args(char* buffer, char** opcode, void** data1, void** data2) {
             (*data1) = space;
         }
     }
-    fprintf(stderr, "pcode:%sd\n", (*opcode));
+    fprintf(stderr, "opcode:%sd\n", (*opcode));
     return 0;
 }
 
 void revoke_token(int socket_fd, char* filename, int index, char token_type) {
+    fprintf(stderr, "start revoke token\n");
     file_t *file = NULL;
     for (int i = 0; i < MAX_FILES; i++) {
         if (strcmp(files[i].filename, filename) == 0) {
@@ -330,10 +342,17 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
             break;
         }
     }
+    if (file == NULL) {
+        fprintf(stderr, "file not found\n");
+        exit(1);
+    }
     //token_node_t *prev = NULL;
     token_node_t *cur = file->write_tokens;
     while(cur != NULL && cur->next != NULL) {
-        if (cur->token->start_block <= index && index <= cur->token->end_block) {
+        int start = cur->token->start_block;
+        int end = (cur->token->end_block == -1) ? file->recipe->num_blocks - 1 : cur->token->end_block;       
+
+        if (start <= index && index <= end) {
             // found our token...
             // by checking strictly > we can't have out of bounds
             if (index > file->last_write) {
@@ -359,6 +378,8 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
         fprintf(stderr, "[ERROR]: We didn't actually revoke a token... so deal with it\n");
         exit(1);
     }
+    fprintf(stderr, "end revoke token\n");
+
 }
 
 void* revoker(void* arg) {
