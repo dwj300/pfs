@@ -14,6 +14,7 @@
 #define MAX_BLOCKS 100
 #define INVALID_TOKEN -1
 #define INFINITE_TOKEN -1
+#define INVALID_FILE -1
 
 typedef int bool;
 typedef char byte;
@@ -48,8 +49,11 @@ typedef struct file {
     recipe_t* recipe;
     token_node_t* read_tokens;
     token_node_t* write_tokens;
-    int last_write; // TODO: actually set this
-    int last_read;  // TODO: actually set this
+    int last_write; 
+    int last_read;
+    int current_server;
+    int current_stripe; 
+    char mode;
 } file_t;
 
 typedef struct server {

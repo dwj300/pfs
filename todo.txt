@@ -1,3 +1,5 @@
+DONE
+========
 Everything relatex to token management DONE
 -Keep track of tokens on grapevine DONE
 -deal with revokation DONE
@@ -10,28 +12,26 @@ add who i am to get_servers DONE
 keep clients array in grapevine DONE
 add logic to give a read token if you get a write token DONE
 Call flusher thread (have an idea for this, actually all of the code for this is written we are just missing one line. DONE
+last read / last write (for token resolution logic) DONE
+make magic numbers #defines DONE
+deal with stripe width / stripe size (on piazza) (not quite) robin server assignment DONE
+check if client can read / write a file on client side DONE
 
-Write report
 
-future todo:
-Retry logic
-multi thread read / write (shouldn't be too hard)
+TODO
+========
+Write report TODO
+Retry logic TODO
+multi thread read / write (shouldn't be too hard) TODO (actually very easy, only thing is overhead might not make sense)
 
 
 modification time, and push to server TODO
-last read / last write (for token resolution logic) TODO
 add ability to get stat after opening... TODO
 keep track of partial block size TODO
 add command to grapevine to keep track of exact size TODO
-check if client can read / write a file on client side TODO
 Call harvester thread TODO
 deal with stale stat entries TODO
-deal with stripe width / stripe size (on piazza) (not quite) robin server assignment TODO
 actually use CLIENT_CACHE_SIZE
-
-WHY THE FUCK ISNT REVOKE BLOCKING...
-
-make magic numbers #defines
 
 
 test cases:
@@ -43,3 +43,5 @@ Cache hit on write then read on same client DONE
 
 write 4k (last_write = 3?) then sleep for 10
 read @ block1
+
+ 

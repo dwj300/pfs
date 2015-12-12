@@ -128,6 +128,7 @@ int pfs_open(const char *filename, const char mode) {
     int fd = current_fd;
     current_fd += 1;
     files[fd].filename = filename;
+    file.mode = mode;
     fprintf(stderr, "h1\n");
 
     int socket_fd = connect_socket(grapevine_host, grapevine_port);
@@ -144,7 +145,7 @@ int pfs_open(const char *filename, const char mode) {
     pfs_stat_t *stats = malloc(sizeof(pfs_stat_t));
     read(socket_fd, recipe, sizeof(recipe_t));
     files[fd].recipe = recipe;
-    if(files[fd].recipe->num_blocks == -1) {
+    if(files[fd].recipe->num_blocks == INVALID_FILE) {
         fprintf(stderr, "Could not open %s. file does not exist\n", filename);
         return -1;
     }
@@ -164,7 +165,7 @@ void client_create_block(file_t *file) {
     read(socket_fd, recipe, sizeof(recipe_t));
     close(socket_fd);
     file->recipe = recipe;
-    if (file->recipe->num_blocks == -1) {
+    if (file->recipe->num_blocks == INVALID_FILE) {
         fprintf(stderr, "Failed to create a new block.");
         exit(1);
     }
@@ -213,6 +214,10 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
 ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int *cache_hit) {
     *cache_hit = 1;
     file_t *file = &(files[filedes]);
+    if (file->mode != 'W') {
+        fprintf(stderr, "File was not oppened in write mode.\n");
+        return -1;
+    }
     const void* current_pos = buf;
     int start_block_id = offset / (1024*PFS_BLOCK_SIZE);
     int end_block_id = (offset + nbyte - 1) / (1024*PFS_BLOCK_SIZE);

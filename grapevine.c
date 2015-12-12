@@ -12,6 +12,12 @@ int create_file(int socket_fd, char* filename, int stripe_width) {
         return 0;
     }
     else {
+        if (stripe_width < NUM_FILE_SERVERS) {
+            fprintf(stderr, "Error, too many stripes. Please try again.\n");
+            int success = 0;
+            write(socket_fd, &success, sizeof(int));
+            return -1;
+        }
         file_t* file = malloc(sizeof(file_t));
         file->filename = filename;
         pfs_stat_t* stat = malloc(sizeof(pfs_stat_t));
@@ -22,6 +28,8 @@ int create_file(int socket_fd, char* filename, int stripe_width) {
         file->read_tokens = NULL;
         file->write_tokens = NULL;
         file->stripe_width = stripe_width; // TODO: actually use this.
+        file->current_stripe = 0;
+        file->current_stripe = 0;
 
         recipe_t *recipe = malloc(sizeof(recipe_t));
         recipe->num_blocks = 0;
@@ -35,8 +43,6 @@ int create_file(int socket_fd, char* filename, int stripe_width) {
     return 1;
 }
 
-//WHY IS TOEKB NOT BLOCKING
-// Please note -1 start means token was deleted...
 void revoke_token(char* filename, int index, int client_id, token_t* token, char token_type) {
     // sends a message to the correct client (lookip via clients table)
     // tell them to revoke
@@ -382,7 +388,7 @@ int open_file(int socket_fd, char* filename) {
     if (e == NULL) {
         fprintf(stderr, "File: %s does not exist\n", filename);
         recipe_t* recipe = malloc(sizeof(recipe_t));
-        recipe->num_blocks = -1;
+        recipe->num_blocks = INVALID_FILE;
         write(socket_fd, recipe, sizeof(recipe_t));
         close(socket_fd);
         return -1;
@@ -419,7 +425,7 @@ int create_block_gv(int socket_fd, char *filename) {
     if (e == NULL) {
         fprintf(stderr, "file: %s doesn't exist", filename);
         recipe_t* recipe = malloc(sizeof(recipe_t));
-        recipe->num_blocks = -1;
+        recipe->num_blocks = INVALID_FILE;
         write(socket_fd, recipe, sizeof(recipe_t));
         close(socket_fd);
         return -1;
@@ -438,7 +444,15 @@ int create_block_gv(int socket_fd, char *filename) {
     int server = (current_server_id % NUM_FILE_SERVERS);
     current_server_id += 1;
 
-    file->recipe->blocks[file->recipe->num_blocks].server_id = server; // TODO: Round robin?
+    if (file->current_stripe == STRIP_SIZE - 1) {
+        file->current_stripe = 0;
+        file->current_server += 1;
+        file->current_server = file->current_server % file->stripe_width;
+    }
+
+    file->recipe->blocks[file->recipe->num_blocks].server_id = server;
+    file->current_stripe += 1;
+
     fprintf(stderr, "assigning server %d\n", server);
     
     file->recipe->num_blocks += 1;
