@@ -6,7 +6,6 @@ bool CacheIsTooCrowded(cache_t* cache) {
 
 bool CacheIsTooVacant(cache_t* cache) {
     return (cache->Occupancy < cache->LowWaterMark);
-
 }
 
 //Should only be called if a lock on the block is held by the caller
@@ -244,14 +243,17 @@ block_t* ReserveAndLockBlockInCache(cache_t* cache, global_block_id_t blockToRes
     block_list_node_t* freeNode = removeNodeFromHeadOfList(cache->ActivityTable->FreeStack);
 
     if( freeNode ) {
+        block_t * freeBlock = freeNode->block;
+        pthread_mutex_lock(freeBlock->lock);
+        freeBlock->id = blockToReserveFor;
         //The block needs to be added to the access queue and recorded in the active block map
         addBlockMapping(cache->ActivityTable, freeNode);
         addNodeToHeadOfList(cache->ActivityTable->AccessQueue, freeNode);
         cache->Occupancy++;
-        block_t * freeBlock = freeNode->block;
+        if(CacheIsTooCrowded(cache)) {
+            sem_post(cache->OccupancyMonitor);
+        }
         pthread_mutex_unlock(cache->ActivityTable->lock);
-        pthread_mutex_lock(freeBlock->lock);
-        freeBlock->id = blockToReserveFor;
         return freeNode->block;
     }
     else{
@@ -446,31 +448,11 @@ void CacheReport(cache_t* cache) {
     }
 }
 
-// TODO: ?
-void FlushDirtyBlocks(cache_t* hostCache) {
-    fprintf(stderr, "Starting flushing. \n");
-    int flushed = 0;
-
-    pthread_mutex_lock(hostCache->DirtyListLock);
-    global_block_id_t currentTarget = popIDFromIDList(&(hostCache->DirtyList));
-    pthread_mutex_unlock(hostCache->DirtyListLock);
-
-    while(currentTarget != BLOCK_IS_FREE) {
-        if( FlushBlockToServer(hostCache, currentTarget)){
-            flushed++;
-        }
-        pthread_mutex_lock(hostCache->DirtyListLock);
-        currentTarget = popIDFromIDList( &(hostCache->DirtyList) );
-        pthread_mutex_unlock(hostCache->DirtyListLock);
-    }
-    fprintf(stderr, "%d blocks flushed.\n", flushed);
-}
-
 // TODO:
 void Harvest(cache_t* cache) {
     int harvested = 0;
 
-    while(CacheIsTooCrowded(cache)) {
+    while(!CacheIsTooVacant(cache)) {
         if(EvictBlockToCache(cache)) {
             harvested += 1;
         }
@@ -480,38 +462,18 @@ void Harvest(cache_t* cache) {
 }
 
 void* HarvesterThread(void *cache) {
-    // cache_t* hostCache = (cache_t*)cache;
-    //harvest(hostCache);
+    cache_t* hostCache = (cache_t*)cache;
+    while(!hostCache->exiting){
+        sem_wait(hostCache->OccupancyMonitor);
+        Harvest(hostCache);
+    }
     return NULL;
 }
 
 // TODO:
 void SpawnHarvester(cache_t* cache) {
-    //pthread_t* hostThread = (pthread_t*)malloc(sizeof(pthread_t));
+    fprintf(stderr, "Spawning Harvester Thread\n");
     pthread_create(&threads[1], NULL, &HarvesterThread, (void*)cache);
-    //pthread_join(*hostThread, malloc(4));
-    //fprintf(stderr, "Done harvesting. \n");
-}
-
-// TODO:
-void* FlusherThread(void* cache) {
-    cache_t* hostCache = (cache_t*)cache;
-    while(true) {
-        FlushDirtyBlocks(hostCache);
-        //if (hostCache->exiting) {
-        //    fprintf(stderr, "Flusher exiting");
-        //    pthread_exit(NULL);
-        //}
-        sleep(30);
-    }
-}
-
-void SpawnFlusher(cache_t* cache) {
-    fprintf(stderr, "Spawning Flusher Thread\n");
-    //pthread_t* hostThread = (pthread_t*)malloc(sizeof(pthread_t));
-    pthread_create(&threads[0], NULL, &FlusherThread, (void*)cache); //FlushDirtyBlocks, (void*)cache); //int flusher = ?
-    //pthread_join(*hostThread, malloc(4)); // We don't wanna block on this...
-    //fprintf(stderr, "Done flushing. \n");
 }
 
 //DOESN'T remove the id from the dirty list, since you might supply the id by doing so in the caller via a pop preceding the call to this function
@@ -542,6 +504,40 @@ bool FlushBlockToServer(cache_t* hostCache, global_block_id_t id) {
     }
 }
 
+void FlushDirtyBlocks(cache_t* hostCache) {
+    fprintf(stderr, "Starting flushing. \n");
+    int flushed = 0;
+
+    pthread_mutex_lock(hostCache->DirtyListLock);
+    global_block_id_t currentTarget = popIDFromIDList(&(hostCache->DirtyList));
+    pthread_mutex_unlock(hostCache->DirtyListLock);
+
+    while(currentTarget != BLOCK_IS_FREE) {
+        if( FlushBlockToServer(hostCache, currentTarget)){
+            flushed++;
+        }
+        pthread_mutex_lock(hostCache->DirtyListLock);
+        currentTarget = popIDFromIDList( &(hostCache->DirtyList) );
+        pthread_mutex_unlock(hostCache->DirtyListLock);
+    }
+    fprintf(stderr, "%d blocks flushed.\n", flushed);
+}
+
+// TODO:
+void* FlusherThread(void* cache) {
+    cache_t* hostCache = (cache_t*)cache;
+    while(!hostCache->exiting) {
+        FlushDirtyBlocks(hostCache);
+        sleep(30);
+    }
+    return NULL;
+}
+
+void SpawnFlusher(cache_t* cache) {
+    fprintf(stderr, "Spawning Flusher Thread\n");
+    pthread_create(&threads[0], NULL, &FlusherThread, (void*)cache); //FlushDirtyBlocks, (void*)cache); //int flusher = ?
+}
+
 cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWaterMarkPercent, float lowWaterMarkPercent) {
     if(highWaterMarkPercent > 100.0F || highWaterMarkPercent < 0.0F ||
         lowWaterMarkPercent > 100.0F || lowWaterMarkPercent < 0.0F  ||
@@ -551,21 +547,25 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
     }
 
     cache_t* newCache = (cache_t*)malloc(sizeof(cache_t));
-    newCache->exiting = 0;
-    newCache->ManagedMemory = (byte*)calloc(blockCount, blockSize);
+    newCache->exiting = false;
+    newCache->ManagedMemory = (byte*)malloc(blockSize* blockCount);
 
     newCache->BlockCount = blockCount;
     newCache->BlockSize = blockSize;
 
     newCache->HighWaterMark = (uint32_t)((highWaterMarkPercent/100)*blockCount);
     newCache->LowWaterMark = (uint32_t)((lowWaterMarkPercent/100)*blockCount);
-    newCache->BlockSize = blockSize;
+    newCache->Occupancy = 0;
+    newCache->OccupancyMonitor = (sem_t*)malloc(sizeof(sem_t));
+    sem_init(newCache->OccupancyMonitor, 0, 0);
 
     newCache->DirtyList = NULL;
     newCache->DirtyListLock = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
 
     newCache->ActivityTable = initializeActivityTable(newCache->ManagedMemory, blockCount, blockSize);
     SpawnFlusher(newCache);
+    SpawnHarvester(newCache);
+
     return newCache;
 }
 
@@ -580,18 +580,20 @@ void test_cache(int argc, char* argv[]) {
     cache_t* cache = InitializeCache(blockSize, blockCount, highWaterMark, lowWaterMark);
     CacheReport(cache);
 
-    uint32_t i;
-    for(i = 1; i <= blockCount; i++) {
-        ReserveAndLockBlockInCache(cache, i);
-        byte* data = malloc(blockSize);
-        int present;
-        WriteToBlockAndMarkDirty(cache, i, data, 0, 1024, 0, &present);
+    bool here;
+    uint32_t i = 0;
+    for(;i<cache->HighWaterMark;i++) {
+        block_t * block = ReserveAndLockBlockInCache(cache, i);
+        pthread_mutex_unlock(block->lock);
+        WriteToBlockAndMarkDirty(cache, i, "test", 0, 5, 0, &here);
     }
-    CacheReport(cache);
-    //SpawnHarvester(cache);
-    CacheReport(cache);
-    //SpawnFlusher(cache);
-    CacheReport(cache);
+    sleep(2);
+    for(;i<cache->BlockCount;i++) {
+        block_t * block = ReserveAndLockBlockInCache(cache, i);
+        pthread_mutex_unlock(block->lock);
+        WriteToBlockAndMarkDirty(cache, i, "test", 0, 5, 0, &here);
+    }
+
 
 /*
 

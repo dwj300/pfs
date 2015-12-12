@@ -1,5 +1,6 @@
 #include "blockStructs.h"
 #include "client.h"
+#include <semaphore.h>
 
 #define CACHE_MAP_SECTOR_COUNT 8
 
@@ -22,6 +23,7 @@ typedef struct cache {
     uint32_t LowWaterMark;
     id_list_node_t* DirtyList;
     pthread_mutex_t* DirtyListLock;
+    sem_t * OccupancyMonitor;
     activity_table_t* ActivityTable;
     byte* ManagedMemory;
     bool exiting;
