@@ -162,7 +162,6 @@ void client_create_block(file_t *file) {
     fprintf(stderr, "New num_blocks: %d\n", file->recipe->num_blocks);
 }
 
-// TODO: token logic
 ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache_hit) {
     *cache_hit = 1;
     file_t* file = &(files[filedes]);
@@ -172,9 +171,9 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
     int current_offset = offset - (start_block_id*1024*PFS_BLOCK_SIZE);
     int bytes_read = 0;
     for(int i = start_block_id; i <= end_block_id; i++) {
-        if (i+1 >= file->recipe->num_blocks) {
+        if (i+1 > file->recipe->num_blocks) {
             // Block doesn't exist... fail.
-            fprintf(stderr, "block doesn't exist.\n");
+            fprintf(stderr, "block index: %d doesn't exist.\n", i);
             return -1;
         }
         if(!check_read_token(file, i)) {

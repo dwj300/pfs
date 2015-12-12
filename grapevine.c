@@ -436,26 +436,31 @@ int create_block_gv(int socket_fd, char *filename) {
 }
 
 int parse_args(char* buffer, char** opcode, void** data1, void** data2) {
+    fprintf(stderr, "in parse_args, command:%sd\n", buffer);
     char* space = strchr(buffer, ' ');
-    *opcode = malloc(sizeof(char) * 10);
+    *opcode = malloc(sizeof(char) * 20);
     if (space == NULL) {
         (*opcode) = buffer;
     }
     else{
         char *end = stpncpy(*opcode, buffer, (space - buffer));
         (*end) = '\0';
-        space += sizeof(char);
+        space += sizeof(char); // increment space pointer to first char of filename
         char* next_space = strchr(space, ' ');
         if (next_space != NULL) {
             (*data1) = malloc(255 * sizeof(char));
-            strncpy(*data1, space, (next_space-space));
+            char *end2 = stpncpy(*data1, space, (next_space - space));
+            (*end2) = '\0';
+
+            //strncpy(*data1, space, (next_space-space));
             (*data2) = (next_space + sizeof(char));
         }
         else {
-            (*data1) = space;
+            (*data1) = space; // this might be a problem, idk
         }
     }
     fprintf(stderr, "fooopcode:%sd\n", (*opcode));
+    fprintf(stderr, "filename:%sd\n", (char*)(*data1));
     return 0;
 }
 
