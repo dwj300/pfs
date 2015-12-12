@@ -3,13 +3,14 @@
 int main(int argc, char* argv[]) {
     initialize(argc, argv);
     pfs_create("foo.txt", 1);
-    int fd = pfs_open("foo.txt", 'w');
-    char *data = "test data123";
+    int fd = pfs_open("pfs_file1", 'w');
+    //char *data = "test data123";
     //char *data1 = malloc(sizeof(data)+1);
     int cache_hit;
     //int cache_hit2;
+    char *data = malloc(1024);
     
-    pfs_write(fd, data, strlen(data)+1, 0, &cache_hit);
+    pfs_read(fd, data, 1024, 0, &cache_hit);
     pfs_close(fd);
     /*
     sleep(30);

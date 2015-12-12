@@ -62,6 +62,10 @@ int main(int argc, char *argv[])
     //Write the first 200 bytes of data from the input file onto pfs_file
     err_value = pfs_write(fdes, (void *)buf, 4*ONEKB, 0, &cache_hit);
     printf("Wrote %d bytes to the file\n", err_value);
+    //sleep(5);
+    //err_value = pfs_read(fdes, (void *)buf, 4*ONEKB, 0, &cache_hit);
+    //fprintf(stderr, "This should be a cache_hit: %d\n", cache_hit);
+    sleep(10);
     pfs_close(fdes);
     free(buf);
     close(ifdes);

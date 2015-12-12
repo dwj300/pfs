@@ -5,11 +5,11 @@ bool check_read_token(file_t* file, int block_index) {
     while(cur != NULL) {
         token_t* token = cur->token;
         int start = token->start_block;
-        if (start == -1) {
+        if (start == INVALID_TOKEN) {
             cur = cur->next;
             continue;
         }
-        int end = (token->end_block == -1) ? file->recipe->num_blocks - 1 : token->end_block;       
+        int end = (token->end_block == INFINITE_TOKEN) ? file->recipe->num_blocks - 1 : token->end_block;       
         if ((start <= block_index) && (block_index <= end)) {
             return true;
         }
@@ -24,11 +24,11 @@ bool check_write_token(file_t* file, int block_index) {
     while(cur != NULL) {
         token_t* token = cur->token;
         int start = token->start_block;
-        if (start == -1) {
+        if (start == INVALID_TOKEN) {
             cur = cur->next;
             continue;
         }
-        int end = (token->end_block == -1) ? file->recipe->num_blocks - 1 : token->end_block;       
+        int end = (token->end_block == INFINITE_TOKEN) ? file->recipe->num_blocks - 1 : token->end_block;       
         if ((start <= block_index) && (block_index <= end)) {
             return true;
         }
@@ -128,6 +128,7 @@ int pfs_open(const char *filename, const char mode) {
     int fd = current_fd;
     current_fd += 1;
     files[fd].filename = filename;
+    file.mode = mode;
     fprintf(stderr, "h1\n");
 
     int socket_fd = connect_socket(grapevine_host, grapevine_port);
@@ -144,7 +145,7 @@ int pfs_open(const char *filename, const char mode) {
     pfs_stat_t *stats = malloc(sizeof(pfs_stat_t));
     read(socket_fd, recipe, sizeof(recipe_t));
     files[fd].recipe = recipe;
-    if(files[fd].recipe->num_blocks == -1) {
+    if(files[fd].recipe->num_blocks == INVALID_FILE) {
         fprintf(stderr, "Could not open %s. file does not exist\n", filename);
         return -1;
     }
@@ -164,7 +165,7 @@ void client_create_block(file_t *file) {
     read(socket_fd, recipe, sizeof(recipe_t));
     close(socket_fd);
     file->recipe = recipe;
-    if (file->recipe->num_blocks == -1) {
+    if (file->recipe->num_blocks == INVALID_FILE) {
         fprintf(stderr, "Failed to create a new block.");
         exit(1);
     }
@@ -213,6 +214,10 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
 ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int *cache_hit) {
     *cache_hit = 1;
     file_t *file = &(files[filedes]);
+    if (file->mode != 'W') {
+        fprintf(stderr, "File was not oppened in write mode.\n");
+        return -1;
+    }
     const void* current_pos = buf;
     int start_block_id = offset / (1024*PFS_BLOCK_SIZE);
     int end_block_id = (offset + nbyte - 1) / (1024*PFS_BLOCK_SIZE);
@@ -368,12 +373,12 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
     
         while(cur != NULL) {
             int start = cur->token->start_block;
-            int end = (cur->token->end_block == -1) ? file->recipe->num_blocks - 1 : cur->token->end_block;       
+            int end = (cur->token->end_block == INFINITE_TOKEN) ? file->recipe->num_blocks - 1 : cur->token->end_block;       
 
             if (start <= index && index <= end) {
                 // found our token...
                 if (start == end) {
-                    cur->token->start_block = -1;
+                    cur->token->start_block = INVALID_TOKEN;
                 }
                 // by checking strictly > we can't have out of bounds
                 else if (index > file->last_write) {
@@ -388,6 +393,14 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
                     fprintf(stderr, "start: %d, end: %d, index:%d\n", start, end, index);
                     exit(1);
                 }
+                // block id 4 OOB with #blocks 4 
+                if (cur->token->start_block >= file->recipe->num_blocks) {
+                    cur->token->start_block = INVALID_TOKEN; // INVALID TOKEN
+                }
+                // if its already invalid some how, keep it that way
+                if (cur->token->start_block < 0) {
+                    cur->token->start_block = INVALID_TOKEN; // INVALID TOKEN    
+                }
                 // Send back the new token:
                 write(socket_fd, cur->token, sizeof(token_t));
                 break;
@@ -401,12 +414,12 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
     
         while(cur != NULL) {
             int start = cur->token->start_block;
-            int end = (cur->token->end_block == -1) ? file->recipe->num_blocks - 1 : cur->token->end_block;       
+            int end = (cur->token->end_block == INFINITE_TOKEN) ? file->recipe->num_blocks - 1 : cur->token->end_block;       
 
             if (start <= index && index <= end) {
                 // found our token...
                 if (start == end) {
-                    cur->token->start_block = -1;
+                    cur->token->start_block = INVALID_TOKEN;
                 }
                 // by checking strictly > we can't have out of bounds
                 else if (index > file->last_read) {
@@ -421,6 +434,10 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
                     fprintf(stderr, "start: %d, end: %d, index:%d\n", start, end, index);
                     exit(1);
                 }
+                // block id 4 OOB with #blocks 4 
+                if (cur->token->start_block >= file->recipe->num_blocks) {
+                    cur->token->start_block = INVALID_TOKEN;
+                }
                 // Send back the new token:
                 write(socket_fd, cur->token, sizeof(token_t));
                 break;
@@ -433,6 +450,7 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
         fprintf(stderr, "[ERROR]: We didn't actually revoke a token... so deal with it\n");
         exit(1);
     }
+    fprintf(stderr, "#: %d index: %d\n", file->recipe->num_blocks, index);
     fprintf(stderr, "sent back %d->%d on client %d\n", cur->token->start_block, cur->token->end_block, cur->token->client_id);
     fprintf(stderr, "end revoke token\n");
 
