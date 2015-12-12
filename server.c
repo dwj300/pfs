@@ -81,12 +81,11 @@ int main(int argc, char *argv[]) {
     int sockfd, newsockfd, port, n;
     socklen_t clilen;
     if (argc < 2) {
-        fprintf(stderr, "usage: server [port]\n"); //[directory]");
+        fprintf(stderr, "usage: server [port]\n");
         exit(1);
     }
     else {
         port = atoi(argv[1]);
-        //char *directory = argv[2]; //todo
     }
     printf("File server starting on port: %d\n", port);
 

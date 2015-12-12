@@ -251,6 +251,7 @@ block_t* ReserveAndLockBlockInCache(cache_t* cache, global_block_id_t blockToRes
         addNodeToHeadOfList(cache->ActivityTable->AccessQueue, freeNode);
         cache->Occupancy++;
         if(CacheIsTooCrowded(cache)) {
+            need_to_harvest = true;
             //sem_post(cache->OccupancyMonitor);
         }
         pthread_mutex_unlock(cache->ActivityTable->lock);
@@ -448,8 +449,8 @@ void CacheReport(cache_t* cache) {
     }
 }
 
-// TODO:
 void Harvest(cache_t* cache) {
+    fprintf(stderr, "Harvesting!\n");
     int harvested = 0;
 
     while(!CacheIsTooVacant(cache)) {
@@ -458,19 +459,22 @@ void Harvest(cache_t* cache) {
         }
     }
     fprintf(stderr, "%d blocks harvested.\n", harvested);
-    //pthread_exit(0);
 }
 
+// Would be better to use a semaphore, but otherwise we don't knowwhen we could quit because there is no cleanup API.
 void* HarvesterThread(void *cache) {
     cache_t* hostCache = (cache_t*)cache;
-    while(!hostCache->exiting){
+    while(true){
+        if (need_to_harvest) {
+            Harvest(hostCache);
+            need_to_harvest = false;
+        }
+        sleep(10);
         //sem_wait(hostCache->OccupancyMonitor);
-        Harvest(hostCache);
     }
     return NULL;
 }
 
-// TODO:
 void SpawnHarvester(cache_t* cache) {
     fprintf(stderr, "Spawning Harvester Thread\n");
     pthread_create(&threads[1], NULL, &HarvesterThread, (void*)cache);
@@ -528,7 +532,6 @@ void FlushDirtyBlocks(cache_t* hostCache) {
     fprintf(stderr, "%d blocks flushed.\n", flushed);
 }
 
-// TODO:
 void* FlusherThread(void* cache) {
     cache_t* hostCache = (cache_t*)cache;
     while(!hostCache->exiting) {
@@ -569,7 +572,7 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
 
     newCache->ActivityTable = initializeActivityTable(newCache->ManagedMemory, blockCount, blockSize);
     SpawnFlusher(newCache);
-    //SpawnHarvester(newCache);
+    SpawnHarvester(newCache);
 
     return newCache;
 }

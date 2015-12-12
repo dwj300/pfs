@@ -25,7 +25,7 @@ int create_file(int socket_fd, char* filename, int stripe_width) {
         file->stat = stat;
         file->read_tokens = NULL;
         file->write_tokens = NULL;
-        file->stripe_width = stripe_width; // TODO: actually use this.
+        file->stripe_width = stripe_width;
         file->current_stripe = 0;
         file->current_stripe = 0;
 
@@ -59,12 +59,9 @@ void revoke_token(char* filename, int index, int client_id, token_t* token, char
     close(socket_fd);
     fprintf(stderr, "new client token %d->%d, on client %d\n", token->start_block, token->end_block, token->client_id);
     fprintf(stderr, "GV done revoking token\n");
-    //sleep(5);
 }
 
 void get_read_token(int socket_fd, char* filename, int index, int client_id) {
-    // easy case for now. we can fix logic once we get tokens sending over the wire
-    // TODO
     entry_t* e = lookup(files, filename);
 
     if (e == NULL) {
@@ -156,11 +153,6 @@ void get_read_token(int socket_fd, char* filename, int index, int client_id) {
 }
 
 void get_write_token(int socket_fd, char* filename, int index, int client_id) {
-    fprintf(stderr, "starting temp sleep\n");
-    //sleep(10);
-    fprintf(stderr, "wokeup from temp sleep\n");
-    // this is complicated. psuedocode for now
-    // TODO
     entry_t* e = lookup(files, filename);
 
     if (e == NULL) {
@@ -230,7 +222,7 @@ void get_write_token(int socket_fd, char* filename, int index, int client_id) {
             cur = cur->next;
         }
 
-        // After we have our temp_s and temp_e, look through read tokens doing the same thing?
+        // After we have our temp_s and temp_e, look through read tokens doing the same thing.
         cur = file->read_tokens;
         while(cur != NULL) {
             token_t* token = cur->token;
@@ -438,9 +430,6 @@ int create_block_gv(int socket_fd, char *filename) {
     file->recipe->blocks[file->recipe->num_blocks].block_id = gid;
     fprintf(stderr, "1\n");
     fprintf(stderr, "foo2\n");
-
-    //int server = (current_server_id % NUM_FILE_SERVERS);
-    //current_server_id += 1;
 
     // Round robin
     if (file->current_stripe == STRIP_SIZE - 1) {

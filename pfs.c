@@ -210,8 +210,6 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
     return bytes_read;
 }
 
-// TODO: deal with cache hit ...
-// TODO: token logic
 ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int *cache_hit) {
     *cache_hit = 1;
     file_t *file = &(files[filedes]);
@@ -227,7 +225,7 @@ ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int 
     int bytes_written = 0;
     for(int i = start_block_id; i <= end_block_id; i++) {
         if (i+1 > file->recipe->num_blocks) {
-            // Need to create a block on server. (matbe more. TODO: fix dis)
+            // Need to create a block on server.
             client_create_block(file);
             fprintf(stderr, "new block id: %d\n", file->recipe->blocks[i].block_id);
             fprintf(stderr, "BLOCK_ID: %d\n", files[filedes].recipe->blocks[i].block_id);
@@ -433,7 +431,6 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
                 }
                 else if (index < file->last_read) {
                     cur->token->start_block = file->last_read + 1;
-                    // TODO: check for out of bounds
                 }
                 else {
                     fprintf(stderr, "[ERROR]: Some very strange case just happened...\n");
@@ -444,8 +441,7 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
                 if (cur->token->start_block >= file->recipe->num_blocks) {
                     cur->token->start_block = INVALID_TOKEN;
                 }
-                // Send back the new token:
-                //write(socket_fd, cur->token, sizeof(token_t));
+                
                 break;
             }
             cur = cur->next;
@@ -481,7 +477,7 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
                 }
             }
         }
-
+        // Send back the new token: 
         write(socket_fd, cur->token, sizeof(token_t));
     }
     fprintf(stderr, "#: %d index: %d\n", file->recipe->num_blocks, index);
@@ -571,8 +567,4 @@ void initialize(int argc, char **argv) {
     current_fd = 0;
     cache = InitializeCache(PFS_BLOCK_SIZE * 1024, 2048, 80, 20);
     pthread_create(&revoker_thread, NULL, revoker, NULL);
-}
-
-void cleanup() {
-    cache->exiting = true; // TODO: probably not needed
 }

@@ -17,11 +17,10 @@ ssize_t pfs_read(int filedes, void *buf, ssize_t nbyte, off_t offset, int *cache
 ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int *cache_hit);
 int pfs_close(int filedes);
 int pfs_delete(const char *filename);
-int pfs_fstat(int filedes, struct pfs_stat *buf); // Check the config file for the definition of pfs_stat structure
+int pfs_fstat(int filedes, struct pfs_stat *buf);
 void initialize(int argc, char **argv);
-void cleanup();
 
-file_t files[MAX_FILES]; // TODO: maybe put this on heap
+file_t files[MAX_FILES]; 
 cache_t *cache;
 int current_fd;
 char *grapevine_host;
