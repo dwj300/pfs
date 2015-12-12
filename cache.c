@@ -146,12 +146,16 @@ bool removeBlockMapping(activity_table_t* hostTable, block_list_node_t* toRemove
 }
 
 bool UnlockBlock(cache_t* cache, global_block_id_t targetBlock) {
+    pthread_mutex_lock(cache->ActivityTable->lock);
     block_list_node_t* hostingNode = findBlockNodeInAccessQueue(cache->ActivityTable, targetBlock);
     if(!hostingNode) {
+        pthread_mutex_unlock(cache->ActivityTable->lock);
         return false;
     }
     else {
         block_t* toUnlock = hostingNode->block;
+        pthread_mutex_unlock(cache->ActivityTable->lock);
+
         pthread_mutex_unlock(toUnlock->lock);
     }
     return true;
@@ -192,10 +196,11 @@ bool EvictBlockToCache(cache_t* cache) {
         pthread_mutex_unlock(cache->ActivityTable->lock);
         return false;
     }
+
+    block_t* toRelease = toEvict->block;
     pthread_mutex_unlock(cache->ActivityTable->lock);
 
     //Clear the block / write back if needed
-    block_t* toRelease = toEvict->block;
     pthread_mutex_lock(toRelease->lock);
     if( (toRelease->dirty) ) {
         if(!pushBlockToServer(toRelease)) {
@@ -228,7 +233,7 @@ bool EvictBlockToCache(cache_t* cache) {
     return true;
 }
 
-block_t* ReserveBlockInCache(cache_t* cache, global_block_id_t blockToReserveFor) {
+block_t* ReserveAndLockBlockInCache(cache_t* cache, global_block_id_t blockToReserveFor) {
     if(!cache || !(cache->ActivityTable)) {
         fprintf(stderr, "The cache object has no been properly initialized\n");
     }
@@ -239,19 +244,20 @@ block_t* ReserveBlockInCache(cache_t* cache, global_block_id_t blockToReserveFor
     block_list_node_t* freeNode = removeNodeFromHeadOfList(cache->ActivityTable->FreeStack);
 
     if( freeNode ) {
-        freeNode->block->id = blockToReserveFor;
-
         //The block needs to be added to the access queue and recorded in the active block map
         addBlockMapping(cache->ActivityTable, freeNode);
         addNodeToHeadOfList(cache->ActivityTable->AccessQueue, freeNode);
         cache->Occupancy++;
+        block_t * freeBlock = freeNode->block;
         pthread_mutex_unlock(cache->ActivityTable->lock);
+        pthread_mutex_lock(freeBlock->lock);
+        freeBlock->id = blockToReserveFor;
         return freeNode->block;
     }
     else{
         pthread_mutex_unlock(cache->ActivityTable->lock);
         if(EvictBlockToCache(cache)) {
-            return ReserveBlockInCache(cache, blockToReserveFor);
+            return ReserveAndLockBlockInCache(cache, blockToReserveFor);
         }
         fprintf(stderr, "Couldn't reserve a block. There were no free blocks, and eviction failed.\n");
         return NULL;
@@ -264,13 +270,17 @@ bool ReleaseBlockToCache(cache_t* cache, global_block_id_t blockToRelease) {
         return false;
     }
 
+    pthread_mutex_lock(cache->ActivityTable->lock);
+
     //Look into activity table and find the block node holding the block to be released
     block_list_node_t* hostingNode = findBlockNodeInAccessQueue(cache->ActivityTable, blockToRelease);
     if( !hostingNode ) {
+        pthread_mutex_unlock(cache->ActivityTable->lock);
         fprintf(stderr, "The block is not in the access queue.\n");
         return false;
     }
     block_t* toRelease = hostingNode->block;
+    pthread_mutex_unlock(cache->ActivityTable->lock);
 
     //Clear the block / write back if needed
     pthread_mutex_lock(toRelease->lock);
@@ -298,11 +308,13 @@ bool ReleaseBlockToCache(cache_t* cache, global_block_id_t blockToRelease) {
 
     //Remove the node from the access queue and the activity table
     if(!removeNodeFromList(cache->ActivityTable->AccessQueue, hostingNode) || !removeBlockMapping(cache->ActivityTable, hostingNode) ) {
+        pthread_mutex_unlock(cache->ActivityTable->lock);
         return false;
     }
 
     //Add the node to the free stack
     if(!addNodeToHeadOfList(cache->ActivityTable->FreeStack, hostingNode)) {
+        pthread_mutex_unlock(cache->ActivityTable->lock);
         return false;
     }
     cache->Occupancy--;
@@ -317,15 +329,12 @@ bool ReadBlockFromCache(cache_t* cache, global_block_id_t targetBlock, bool* pre
     block_t* blockInCache = GetBlockFromCache(cache, targetBlock);
     if(!blockInCache) {
         *present = false;
-        blockInCache = ReserveBlockInCache(cache, targetBlock);
-
+        blockInCache = ReserveAndLockBlockInCache(cache, targetBlock);
         server_t* server = get_server(server_id);
-        pthread_mutex_lock(blockInCache->lock);
         read_block(server->hostname, server->port, targetBlock, &(blockInCache->data));
     }
     else{
         *present = true;
-        pthread_mutex_lock(blockInCache->lock);
     }
 
     memcpy(buffer, blockInCache->data+offset, nbyte);
@@ -336,9 +345,7 @@ bool ReadBlockFromCache(cache_t* cache, global_block_id_t targetBlock, bool* pre
 }
 
 bool FetchBlockFromServer(cache_t* cache, global_block_id_t idOfBlockToFetch, int server_id) {
-    block_t* block = ReserveBlockInCache(cache, idOfBlockToFetch);
-
-    pthread_mutex_lock(block->lock);
+    block_t* block = ReserveAndLockBlockInCache(cache, idOfBlockToFetch);
     block->host = server_id;
     block->dirty = false;
 
@@ -449,29 +456,8 @@ void FlushDirtyBlocks(cache_t* hostCache) {
     pthread_mutex_unlock(hostCache->DirtyListLock);
 
     while(currentTarget != BLOCK_IS_FREE) {
-        block_list_node_t* hostingNode = findBlockNodeInAccessQueue(hostCache->ActivityTable, currentTarget);
-
-        if(!hostingNode) {
-            fprintf(stderr, "WARN: Block referenced by the dirty list was not found to be active in the cache. Cache is likely corrupt. \n");
-        }
-        else{
-            block_t* blockToFlush = hostingNode->block;
-            pthread_mutex_lock(blockToFlush->lock);
-            if( !blockToFlush->dirty ) {
-                fprintf(stderr, "WARN: Block referenced by the dirty list was found to be clean in the cache. Cache is likely corrupt. \n");
-                pthread_mutex_unlock(blockToFlush->lock);
-            }
-            else if(!pushBlockToServer(hostingNode->block)) {
-                //if a push fails, might as well allow a retry later
-                pthread_mutex_lock(hostCache->DirtyListLock);
-                addIDToIDList( &(hostCache->DirtyList), currentTarget);
-                pthread_mutex_unlock(hostCache->DirtyListLock);
-                pthread_mutex_unlock(blockToFlush->lock);
-            }
-            else{
-                flushed++;
-                pthread_mutex_unlock(blockToFlush->lock);
-            }
+        if( FlushBlockToServer(hostCache, currentTarget)){
+            flushed++;
         }
         pthread_mutex_lock(hostCache->DirtyListLock);
         currentTarget = popIDFromIDList( &(hostCache->DirtyList) );
@@ -528,15 +514,31 @@ void SpawnFlusher(cache_t* cache) {
     //fprintf(stderr, "Done flushing. \n");
 }
 
-void FlushBlockToServer(cache_t* cache, global_block_id_t id) {
-    block_list_node_t* node = findBlockNodeInAccessQueue(cache->ActivityTable, id);
-    if(node){
-        pthread_mutex_lock(node);
-        if(node->block->dirty) {
-            ///If we could meaningfully check success here we could retry in a loop
-            pushBlockToServer(node->block);
+//DOESN'T remove the id from the dirty list, since you might supply the id by doing so in the caller via a pop preceding the call to this function
+bool FlushBlockToServer(cache_t* hostCache, global_block_id_t id) {
+    pthread_mutex_lock(hostCache->ActivityTable->lock);
+    block_list_node_t* hostingNode = findBlockNodeInAccessQueue(hostCache->ActivityTable, id);
+
+    if(!hostingNode) {
+        pthread_mutex_unlock(hostCache->ActivityTable->lock);
+        fprintf(stderr, "Block referenced was not found to be active in the cache. Cache is likely corrupt. \n");
+        return false;
+    }
+    else{
+        block_t* blockToFlush = hostingNode->block;
+        pthread_mutex_unlock(hostCache->ActivityTable->lock);
+        pthread_mutex_lock(blockToFlush->lock);
+        if( !blockToFlush->dirty ) {
+            fprintf(stderr, "WARN: Block referenced was found to be clean in the cache. Cache is likely corrupt. \n");
         }
-        pthread_mutex_unlock(node);
+        else if(!pushBlockToServer(hostingNode->block)) { ///If we could meaningfully check success here we could retry in a loop
+            //if a push fails, might as well allow a retry later
+            pthread_mutex_lock(hostCache->DirtyListLock);
+            addIDToIDList( &(hostCache->DirtyList), id);
+            pthread_mutex_unlock(hostCache->DirtyListLock);
+        }
+        pthread_mutex_unlock(blockToFlush->lock);
+        return true;
     }
 }
 
@@ -580,7 +582,7 @@ void test_cache(int argc, char* argv[]) {
 
     uint32_t i;
     for(i = 1; i <= blockCount; i++) {
-        ReserveBlockInCache(cache, i);
+        ReserveAndLockBlockInCache(cache, i);
         byte* data = malloc(blockSize);
         int present;
         WriteToBlockAndMarkDirty(cache, i, data, 0, 1024, 0, &present);
