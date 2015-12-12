@@ -21,7 +21,7 @@ int pfs_fstat(int filedes, struct pfs_stat *buf); // Check the config file for t
 void initialize(int argc, char **argv);
 void cleanup();
 
-file_t files[MAX_FILES]; // todo: maybe put this on heap
+file_t files[MAX_FILES]; // TODO: maybe put this on heap
 cache_t *cache;
 int current_fd;
 char *grapevine_host;

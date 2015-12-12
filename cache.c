@@ -596,7 +596,7 @@ cache_t* InitializeCache(uint32_t blockSize, uint32_t blockCount, float highWate
     newCache->DirtyListLock = (pthread_mutex_t*)malloc(sizeof(pthread_mutex_t));
 
     newCache->ActivityTable = initializeActivityTable(newCache->ManagedMemory, blockCount, blockSize);
-    // SpawnFlusher(newCache);
+    SpawnFlusher(newCache);
     // SpawnHarvester(newCache);
     return newCache;
 }

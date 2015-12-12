@@ -1,25 +1,14 @@
-Everything relatex to token management
--Keep track of tokens on grapevine
--deal with revokation
--add appropriate code to client to ask for them
-
-Handle the "complicated case" of reading and writing across multiple blocks
-DONE
-
-Write fstat
-DONE (deal with stale entries)
-
-Call flusher thread (have an idea for this, actually all of the code for this is written we are just missing one line.
-Call harvester thread (not )
-
-deal with round robin server assignment
-NOT DONE
-
-Figure out how to flush to server when client is finished.
-DONE (did it via pfs_close)
-
-
-write delete
+Everything relatex to token management DONE
+-Keep track of tokens on grapevine DONE
+-deal with revokation DONE
+-add appropriate code to client to ask for them DONE
+Handle the "complicated case" of reading and writing across multiple blocks DONE
+Figure out how to flush to server when client is finished. (did it via pfs_close) DONE
+Write fstat DONE
+write delete DONE
+add who i am to get_servers DONE
+keep clients array in grapevine DONE
+add logic to give a read token if you get a write token DONE
 
 
 Write report
@@ -29,25 +18,21 @@ Retry logic
 multi thread read / write (shouldn't be too hard)
 
 
-modification time
+modification time, and push to server TODO
 
-add ability to get stat after opening...
+last read / last write (for token resolution logic) TODO
 
-possibly move FD to the server...
+add ability to get stat after opening... TODO
 
-probably need to keep track of whose accesing which files....ugh
+keep track of partial block size TODO
 
-need to deal with revokation.
+add command to grapevine to keep track of exact size TODO
 
 
-keep track of partial block size
-
-add command to grapevine to keep track of size...
-
-add who i am to get_servers
-
-keep clients array in grapevine
 
 check if client can read / write a file on client side
 
-add logic to give a read token if you get a write token..
+Call flusher thread (have an idea for this, actually all of the code for this is written we are just missing one line. DONE
+Call harvester thread TODO
+deal with stale stat entries TODO
+deal with stripe width / stripe size (on piazza) (not quite) robin server assignment TODO
