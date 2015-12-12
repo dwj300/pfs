@@ -28,3 +28,7 @@ Call harvester thread TODO
 deal with stale stat entries TODO
 deal with stripe width / stripe size (on piazza) (not quite) robin server assignment TODO
 actually use CLIENT_CACHE_SIZE
+
+WHY THE FUCK ISNT REVOKE BLOCKING...
+
+make magic numbers #defines

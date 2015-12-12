@@ -19,6 +19,8 @@ int create_file(int socket_fd, char* filename, int stripe_width) {
         stat->pst_ctime = time(0);
         stat->pst_mtime = time(0);
         file->stat = stat;
+        file->read_tokens = NULL;
+        file->write_tokens = NULL;
         file->stripe_width = stripe_width; // TODO: actually use this.
 
         recipe_t *recipe = malloc(sizeof(recipe_t));
@@ -33,6 +35,8 @@ int create_file(int socket_fd, char* filename, int stripe_width) {
     return 1;
 }
 
+//WHY IS TOEKB NOT BLOCKING
+// Please note -1 start means token was deleted...
 void revoke_token(char* filename, int index, int client_id, token_t* token, char token_type) {
     // sends a message to the correct client (lookip via clients table)
     // tell them to revoke
@@ -47,8 +51,11 @@ void revoke_token(char* filename, int index, int client_id, token_t* token, char
     char* command = malloc(270*sizeof(char));
     sprintf(command, "REVOKE %s %d %c", filename, index, token_type);
     write(socket_fd, command, strlen(command)+1);
-    read(socket_fd, &token, sizeof(token_t));
+    read(socket_fd, token, sizeof(token_t));
     close(socket_fd);
+    fprintf(stderr, "new client token %d->%d, on client %d\n", token->start_block, token->end_block, token->client_id);
+    fprintf(stderr, "GV done revoking token\n");
+    //sleep(5);
 }
 
 void get_read_token(int socket_fd, char* filename, int index, int client_id) {
@@ -76,6 +83,11 @@ void get_read_token(int socket_fd, char* filename, int index, int client_id) {
 
             int start = token->start_block;
             int end = token->end_block;
+            if (start == -1) {
+                // its a dud token.
+                cur = cur->next;
+                continue;
+            }
             if (end == -1) {
                 end = file->recipe->num_blocks - 1;
             }
@@ -98,6 +110,11 @@ void get_read_token(int socket_fd, char* filename, int index, int client_id) {
                 start = token->start_block;
                 end = token->end_block;
                 // look at the new token
+                if (start == -1) {
+                    // its a dud token.
+                    cur = cur->next;
+                    continue;
+                }   
                 if (start > index) {
                     temp_e = start - 1;
                 }
@@ -135,6 +152,9 @@ void get_read_token(int socket_fd, char* filename, int index, int client_id) {
 }
 
 void get_write_token(int socket_fd, char* filename, int index, int client_id) {
+    fprintf(stderr, "starting temp sleep\n");
+    //sleep(10);
+    fprintf(stderr, "wokeup from temp sleep\n");
     // this is complicated. psuedocode for now
     // TODO
     entry_t* e = lookup(files, filename);
@@ -142,7 +162,7 @@ void get_write_token(int socket_fd, char* filename, int index, int client_id) {
     if (e == NULL) {
         fprintf(stderr, "File with name:%s doesn't exists.\n", filename);
         token_t* token = malloc(sizeof(token_t));
-        token->start_block = -1;
+        token->start_block = -2;
         token->end_block = -1;
         write(socket_fd, token, sizeof(token_t));
         close(socket_fd);

@@ -12,7 +12,7 @@ int main(int argc, char* argv[]) {
     //sleep(30);
     pfs_read(fd, data1, strlen(data)+1, 0, &cache_hit2);
     fprintf(stderr, "data:%s\n", data1);
-    sleep(12);
+    sleep(100);
     pfs_close(fd);
     //cleanup();*/
     /*if (fd == -1) {
