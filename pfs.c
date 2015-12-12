@@ -353,7 +353,8 @@ int parse_args(char* buffer, char** opcode, void** data1, void** data2) {
 
 void revoke_token(int socket_fd, char* filename, int index, char token_type) {
     // DONE: Also deal with read tokens? I kind of think we should pass in the request which one the client should be revoking
-
+    int old_start = 0;
+    int old_end = 0;
     fprintf(stderr, "start revoke token\n");
     file_t *file = NULL;
     // have to iterate through files cause we are sent a filename not FD
@@ -379,6 +380,8 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
 
             if (start <= index && index <= end) {
                 // found our token...
+                old_start = cur->token->end_block;
+                old_end = cur->token->end_block;
                 if (start == end) {
                     cur->token->start_block = INVALID_TOKEN;
                 }
@@ -404,7 +407,7 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
                     cur->token->start_block = INVALID_TOKEN; // INVALID TOKEN    
                 }
                 // Send back the new token:
-                write(socket_fd, cur->token, sizeof(token_t));
+                // write(socket_fd, cur->token, sizeof(token_t));
                 break;
             }
             cur = cur->next;
@@ -420,6 +423,8 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
 
             if (start <= index && index <= end) {
                 // found our token...
+                old_start = cur->token->end_block;
+                old_end = cur->token->end_block;
                 if (start == end) {
                     cur->token->start_block = INVALID_TOKEN;
                 }
@@ -441,7 +446,7 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
                     cur->token->start_block = INVALID_TOKEN;
                 }
                 // Send back the new token:
-                write(socket_fd, cur->token, sizeof(token_t));
+                //write(socket_fd, cur->token, sizeof(token_t));
                 break;
             }
             cur = cur->next;
@@ -451,6 +456,34 @@ void revoke_token(int socket_fd, char* filename, int index, char token_type) {
     if (cur == NULL) {
         fprintf(stderr, "[ERROR]: We didn't actually revoke a token... so deal with it\n");
         exit(1);
+    }
+    else {
+        int new_start = cur->token->start_block;
+        int new_end = cur->token->end_block;
+
+        if (cur->token->end_block == INFINITE_TOKEN) {
+            new_end = file->recipe->num_blocks - 1;
+        }
+        if (old_end == INFINITE_TOKEN) {
+            old_end = file->recipe->num_blocks - 1;
+        }
+        // flush dirty blocks to server
+        if (cur->token->start_block == INVALID_TOKEN) {
+            // If token is invalid, flush them all
+            for (int i = 0; i < file->recipe->num_blocks; i++) {
+                FlushBlockToServer(cache, file->recipe->blocks[i].block_id);
+            }
+        }
+        else {
+            // Go through all blocks from old list and flush accordingly
+            for (int i = old_start; i <= old_end; i++) {
+                if (!(new_start <= i && i <= new_end)) {
+                    FlushBlockToServer(cache, file->recipe->blocks[i].block_id); 
+                }
+            }
+        }
+
+        write(socket_fd, cur->token, sizeof(token_t));
     }
     fprintf(stderr, "#: %d index: %d\n", file->recipe->num_blocks, index);
     fprintf(stderr, "sent back %d->%d on client %d\n", cur->token->start_block, cur->token->end_block, cur->token->client_id);
