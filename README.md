@@ -3,18 +3,13 @@ Parallel File System
 
 Hashtable:http://c.learncodethehardway.org/book/ex37.html
 
-server
+To run, open 4 terminal tabs:
 
-grapevine
+1.) ./server 8081
 
-client_lib
+2.) ./server 8082
 
+3.) ./grapevine 9876
 
+4.) ./c1 localhost 9876 8080
 
-I/O
-
-1.) files array
-    fd index into it
-
-    linked list of tokens
-    

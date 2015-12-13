@@ -452,6 +452,7 @@ int create_block_gv(int socket_fd, char *filename) {
     write(socket_fd, file->recipe, sizeof(recipe_t));
     close(socket_fd);
     file->stat->pst_size += 1024 * PFS_BLOCK_SIZE;
+    file->stat->pst_mtime = time(0);
     current_block_id += 1;
 
     return gid;

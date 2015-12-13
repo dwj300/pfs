@@ -170,6 +170,7 @@ void client_create_block(file_t *file) {
         fprintf(stderr, "Failed to create a new block.");
         exit(1);
     }
+    file->stat->pst_size += 1024 * PFS_BLOCK_SIZE;
     fprintf(stderr, "New num_blocks: %d\n", file->recipe->num_blocks);
 }
 
@@ -228,15 +229,11 @@ ssize_t pfs_write(int filedes, const void *buf, size_t nbyte, off_t offset, int 
             // Need to create a block on server.
             client_create_block(file);
             fprintf(stderr, "new block id: %d\n", file->recipe->blocks[i].block_id);
-            fprintf(stderr, "BLOCK_ID: %d\n", files[filedes].recipe->blocks[i].block_id);
         }
-        fprintf(stderr, "we have a problem0\n");
+
         if(!check_write_token(file, i)) {
-            fprintf(stderr, "we have a problem1\n");
             get_write_token(file, i);
-            fprintf(stderr, "we have a problem2\n");
         }
-        fprintf(stderr, "we have a problem3\n");
 
         int end_position = current_offset + (nbyte - bytes_written);
         if (end_position > 1024) {
